@@ -49,6 +49,13 @@ jobs:
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' build_tmp/android/app/build.gradle.kts || true
           sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 24/' build_tmp/android/app/build.gradle.kts || true
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' build_tmp/android/app/build.gradle.kts || true
+          # 5b) compileSdk 36（file_picker 8.x 要求 ≥36；kts 写法 compileSdk = flutter.compileSdkVersion）
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' build_tmp/android/app/build.gradle.kts || true
+          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' build_tmp/android/app/build.gradle || true
+          sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 36/' build_tmp/android/app/build.gradle || true
+          # 5c) targetSdk 同步到 36（避免新旧行为混合的告警与限制）
+          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' build_tmp/android/app/build.gradle.kts || true
+          sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 36/' build_tmp/android/app/build.gradle || true
           # 6) 关闭 R8 混淆/资源压缩：第三方插件的反射代码导致 minifyReleaseWithR8 失败
           #    个人内网应用无需混淆，换取构建稳定（APK 体积略大）
           #    脚本自动探测 build.gradle（Groovy）与 build.gradle.kts（Kotlin DSL，2026 stable 默认）
