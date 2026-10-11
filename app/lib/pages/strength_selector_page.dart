@@ -41,7 +41,7 @@ class StrengthSelectorPage extends ConsumerWidget {
           )).toList()),
           orElse: () => const SizedBox(),
         ),
-        const Text('题型选项参考：${errorTypes.join('、')}', style: TextStyle(fontSize: 10, color: Colors.grey)),
+        Text('题型选项参考：${errorTypes.join('、')}', style: const TextStyle(fontSize: 10, color: Colors.grey)),
       ]),
     );
   }
