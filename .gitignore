@@ -1,0 +1,35 @@
+# ===== 密钥与敏感配置（绝不入库）=====
+server/.env
+**/.env
+!**/.env.example
+*.key
+*.pem
+
+# ===== 模型文件（GB 级，绝不入库）=====
+*.gguf
+models/
+
+# ===== 运行时产物 =====
+server/node_modules/
+node_modules/
+logs/
+backups/
+*.log
+
+# ===== 数据库备份与导出 =====
+*.sql
+!server/schema.sql
+*.dump
+
+# ===== Flutter / Android 构建产物 =====
+build/
+build_tmp/
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# ===== 系统文件 =====
+.DS_Store
+Thumbs.db

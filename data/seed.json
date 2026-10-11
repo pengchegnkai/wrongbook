@@ -1,0 +1,56 @@
+{
+  "_note": "示例种子数据。等你粘贴真实错题后覆盖本文件，然后运行 node scripts/seed.js 重新导入。",
+  "subjects": [
+    { "name": "语文", "sort_order": 1 },
+    { "name": "数学", "sort_order": 2 },
+    { "name": "英语", "sort_order": 3 },
+    { "name": "物理", "sort_order": 4 },
+    { "name": "化学", "sort_order": 5 },
+    { "name": "生物", "sort_order": 6 },
+    { "name": "思想政治", "sort_order": 7 },
+    { "name": "历史", "sort_order": 8 },
+    { "name": "地理", "sort_order": 9 },
+    { "name": "信息技术", "sort_order": 10 }
+  ],
+  "chapters": [
+    { "subject": "数学", "name": "集合与常用逻辑用语", "sort_order": 1 },
+    { "subject": "数学", "name": "函数", "sort_order": 2 },
+    { "subject": "数学", "name": "三角函数", "sort_order": 3 },
+    { "subject": "物理", "name": "力与运动", "sort_order": 1 },
+    { "subject": "物理", "name": "电场与电路", "sort_order": 2 },
+    { "subject": "化学", "name": "化学计量", "sort_order": 1 },
+    { "subject": "化学", "name": "氧化还原反应", "sort_order": 2 }
+  ],
+  "knowledge_points": [
+    { "chapter": "集合与常用逻辑用语", "name": "集合的基本运算", "level": 1 },
+    { "chapter": "函数", "name": "函数的单调性与奇偶性", "level": 1 },
+    { "chapter": "三角函数", "name": "正弦定理与余弦定理", "level": 1 },
+    { "chapter": "力与运动", "name": "牛顿第二定律", "level": 1 },
+    { "chapter": "电场与电路", "name": "闭合电路欧姆定律", "level": 1 },
+    { "chapter": "化学计量", "name": "物质的量", "level": 1 },
+    { "chapter": "氧化还原反应", "name": "氧化剂与还原剂", "level": 1 }
+  ],
+  "prompt_templates": [
+    {
+      "name": "默认-全科错题分析",
+      "subject": null,
+      "course_type": "普通高中",
+      "question_type": null,
+      "template_content": "你是一名普通高中全科教师，请按以下要求分析错题：\n【学科】{{subject}}\n【章节】{{chapter}}\n【知识点】{{knowledgePoints}}\n【原题】{{originalQuestion}}\n【我的答案】{{myAnswer}}\n【正确答案】{{correctAnswer}}\n【已有解析】{{analysis}}\n【错因】{{errorType}}\n【掌握度】{{mastery}}\n【题型】{{questionType}}\n【课程类型】{{courseType}}\n【补充】{{extra}}\n\n请输出：1. 错因定位 2. 正确解法（分步）3. 涉及知识点讲解 4. 同类题建议 5. 记忆口诀或突破要点。使用简体中文，逐步推理。",
+      "variables": { "subject": "学科", "chapter": "章节", "knowledgePoints": "知识点", "originalQuestion": "原题", "myAnswer": "我的答案", "correctAnswer": "正确答案", "analysis": "解析", "errorType": "错因", "mastery": "掌握度", "questionType": "题型", "courseType": "课程类型", "extra": "补充" },
+      "is_default": true
+    }
+  ],
+  "example_questions": [
+    {
+      "username": "demo",
+      "subject": "数学",
+      "original_question": "示例题（等待你粘贴真实错题后覆盖）：已知集合 A={x|x²-3x+2=0}，B={x|x²-1=0}，求 A∩B。",
+      "my_answer": "A∩B = {1, 2}",
+      "correct_answer": "{1}",
+      "analysis": "示例解析：A={1,2}，B={1,-1}，故 A∩B={1}。",
+      "error_type": "计算失误",
+      "mastery": "yellow"
+    }
+  ]
+}

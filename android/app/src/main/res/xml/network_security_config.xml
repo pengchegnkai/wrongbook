@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- android/app/src/main/res/xml/network_security_config.xml
+     说明：后端跑在家庭内网的 Termux 上，无 TLS。App 需要连接任意内网 IP（192.168.x.x 等），
+     而 network-security-config 不支持 CIDR 通配，因此允许全局明文 HTTP。
+     取舍：仅限家庭内网使用场景；所有业务 API 仍需 JWT 登录，明文风险为同网段嗅探。
+     如未来上 TLS，将 base-config 改回 false 并按域名逐个放行。 -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

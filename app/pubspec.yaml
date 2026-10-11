@@ -1,0 +1,46 @@
+name: cuoti_app
+description: 错题本 Flutter 客户端（Android 完整实现，其他平台仅抽象接口 + TODO）
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.2.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # 状态管理
+  flutter_riverpod: ^2.4.0
+  # 网络
+  dio: ^5.4.0
+  # 路由
+  go_router: ^12.1.0
+  # 本地缓存（drift 需 codegen，此处选 hive 轻量方案；如需 SQL 可换 drift）
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  # 安全存储
+  flutter_secure_storage: ^9.0.0
+  # 图表
+  fl_chart: ^0.65.0
+  # Markdown / 公式
+  flutter_markdown: ^0.6.18
+  flutter_math_fork: ^0.7.2
+  # 文件与分享
+  file_picker: ^6.1.1
+  share_plus: ^7.2.1
+  path_provider: ^2.1.1
+  # 图片 / OCR
+  image_picker: ^1.0.5
+  google_mlkit_text_recognition: ^0.11.0
+  # 服务发现
+  multicast_dns: ^0.3.2
+
+  # 版本号以 pub.dev 官方页面为准，未逐一实测兼容性，需你 flutter pub get 验证
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
