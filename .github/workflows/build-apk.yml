@@ -71,7 +71,7 @@ jobs:
             build.log
           if-no-files-found: ignore
 
-      - name: 失败时输出关键错误到 Step Summary
+      - name: 失败时输出关键错误到 Step Summary 与 Annotations
         if: failure()
         run: |
           {
@@ -84,6 +84,11 @@ jobs:
             tail -n 30 analyze.log 2>/dev/null || echo '（analyze.log 不存在）'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+          # ::error:: 注解会进入 check-run output.annotations（匿名 API 可读）
+          tail -n 40 build.log 2>/dev/null | grep -E 'error|Error|FAILURE|Exception' | head -15 | while IFS= read -r line; do
+            echo "::error::${line:0:200}"
+          done || true
+          echo "done"
 
       - name: Rename APK with short commit
         run: |
