@@ -17,7 +17,7 @@ class AndroidInferenceEngine implements LocalInferenceEngine {
     connectTimeout: const Duration(seconds: 5),
     receiveTimeout: const Duration(minutes: 6),
   ));
-  final ModelStorageService _storage = AndroidModelStorageService();
+  final ModelStorageService _storage = ModelStorageService();
   final AndroidDeviceCapabilityService _capability = AndroidDeviceCapabilityService();
 
   ModelInfo? _current;
