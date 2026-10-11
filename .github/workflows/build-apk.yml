@@ -91,12 +91,13 @@ jobs:
             tail -n 30 analyze.log 2>/dev/null || echo '（analyze.log 不存在）'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          # ::error:: 注解会进入 check-run annotations（匿名 API 可读）；输出全部 Error 行 + 日志尾部
-          grep -E 'Error:|error:' build.log 2>/dev/null | head -30 | while IFS= read -r line; do
-            echo "::error::E ${line:0:180}"
+          # ::error:: 注解会进入 check-run annotations（匿名 API 可读）
+          # gradle 失败原因在 "What went wrong" 段落（日志中部），尾部只有警告文本
+          awk '/What went wrong/{f=1} f{print; n++} n>14{exit}' build.log 2>/dev/null | while IFS= read -r line; do
+            echo "::error::W ${line:0:180}"
           done
-          tail -n 20 build.log 2>/dev/null | while IFS= read -r line; do
-            echo "::error::B ${line:0:180}"
+          grep -n -E 'FAILURE:|Task .*(failed|not found)|Caused by|Missing class|R8:' build.log 2>/dev/null | head -12 | while IFS= read -r line; do
+            echo "::error::E ${line:0:180}"
           done
           echo "done"
 
