@@ -1,6 +1,7 @@
 /// pages/prompt_template_preview_page.dart —— 填变量 → 预览渲染结果
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../models/prompt_template.dart';
 import '../providers/prompt_template_provider.dart';
 
 class PromptTemplatePreviewPage extends ConsumerStatefulWidget {

@@ -69,7 +69,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                       onPressed: () => _submit(context, ref, q, 'again'), child: const Text('记错了'))),
                     const SizedBox(width: 8),
                     Expanded(child: FilledButton.tonal(
-                      style: FilledButton.styleFrom(foregroundColor: Colors.amber.sh800),
+                      style: FilledButton.styleFrom(foregroundColor: Colors.amber.shade800),
                       onPressed: () => _submit(context, ref, q, 'hard'), child: const Text('有点模糊'))),
                     const SizedBox(width: 8),
                     Expanded(child: FilledButton(

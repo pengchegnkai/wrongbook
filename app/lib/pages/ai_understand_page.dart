@@ -1,4 +1,5 @@
 /// pages/ai_understand_page.dart —— 拍照 → OCR → AI 分区理解 → 草稿校对
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,7 +21,7 @@ class _AiUnderstandPageState extends ConsumerState<AiUnderstandPage> {
     final x = await _picker.pickImage(source: ImageSource.camera, imageQuality: 90);
     if (x == null) return;
     // 先 OCR（本地），再送 AI 分区
-    await ref.read(ocrProvider.notifier).processImage(x.path);
+    await ref.read(ocrProvider.notifier).processImage(File(x.path));
     final ocr = ref.read(ocrProvider).draft;
     if (ocr == null || ocr.originalQuestion.isEmpty) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('OCR 结果为空，无法理解')));

@@ -1,6 +1,7 @@
 /// services/auth_service.dart —— 注册/登录/刷新
 import '../core/api_client.dart';
 import '../models/user.dart';
+import 'token_storage.dart';
 
 class AuthService {
   /// 登录。成功返回 User 并保存 token。

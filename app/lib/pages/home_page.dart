@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../providers/stats_provider.dart';
 import '../providers/local_record_provider.dart';
+import '../providers/task_queue_provider.dart';
 import '../widgets/stat_card.dart';
 import '../widgets/status_badge.dart';
 
