@@ -42,14 +42,21 @@ jobs:
           mkdir -p build_tmp/android/app/src/main/res/xml
           cp android/app/src/main/res/xml/network_security_config.xml \
              build_tmp/android/app/src/main/res/xml/network_security_config.xml
-          # 5) minSdk 24（google_mlkit_text_recognition 要求）
+          # 5) minSdk 24（google_mlkit_text_recognition 要求；兼容 groovy/kts 两种 DSL）
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' build_tmp/android/app/build.gradle || true
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' build_tmp/android/app/build.gradle || true
           sed -i 's/minSdk flutter.minSdkVersion/minSdk 24/' build_tmp/android/app/build.gradle || true
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' build_tmp/android/app/build.gradle.kts || true
+          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 24/' build_tmp/android/app/build.gradle.kts || true
+          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' build_tmp/android/app/build.gradle.kts || true
           # 6) 关闭 R8 混淆/资源压缩：第三方插件的反射代码导致 minifyReleaseWithR8 失败
           #    个人内网应用无需混淆，换取构建稳定（APK 体积略大）
-          python3 ci/disable_minify.py build_tmp/android/app/build.gradle
-          grep -n 'minifyEnabled\|shrinkResources' build_tmp/android/app/build.gradle || echo '（未找到 minify 配置行，将继续）'
+          #    脚本自动探测 build.gradle（Groovy）与 build.gradle.kts（Kotlin DSL，2026 stable 默认）
+          python3 ci/disable_minify.py build_tmp/android/app
+          ls -la build_tmp/android/app/ | grep -E 'build.gradle'
+          grep -n 'minifyEnabled\|shrinkResources\|isMinifyEnabled\|isShrinkResources' \
+            build_tmp/android/app/build.gradle build_tmp/android/app/build.gradle.kts 2>/dev/null \
+            || echo '（未找到 minify 配置行，将继续）'
 
       - name: flutter pub get
         working-directory: build_tmp
