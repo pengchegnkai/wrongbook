@@ -70,5 +70,7 @@ class TaskQueueService {
     }
   }
 
-  Future<void> clear() => _box?.clear();
+  Future<void> clear() async {
+    await _box?.clear();
+  }
 }

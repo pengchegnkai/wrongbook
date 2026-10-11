@@ -84,12 +84,12 @@ jobs:
             tail -n 30 analyze.log 2>/dev/null || echo '（analyze.log 不存在）'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          # ::error:: 注解会进入 check-run annotations（匿名 API 可读）；无条件输出避免 0 注解盲区
-          tail -n 25 build.log 2>/dev/null | while IFS= read -r line; do
-            echo "::error::B ${line:0:180}"
+          # ::error:: 注解会进入 check-run annotations（匿名 API 可读）；输出全部 Error 行 + 日志尾部
+          grep -E 'Error:|error:' build.log 2>/dev/null | head -30 | while IFS= read -r line; do
+            echo "::error::E ${line:0:180}"
           done
-          tail -n 10 analyze.log 2>/dev/null | while IFS= read -r line; do
-            echo "::error::A ${line:0:180}"
+          tail -n 20 build.log 2>/dev/null | while IFS= read -r line; do
+            echo "::error::B ${line:0:180}"
           done
           echo "done"
 
