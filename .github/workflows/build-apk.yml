@@ -42,25 +42,14 @@ jobs:
           mkdir -p build_tmp/android/app/src/main/res/xml
           cp android/app/src/main/res/xml/network_security_config.xml \
              build_tmp/android/app/src/main/res/xml/network_security_config.xml
-          # 5) minSdk 24（google_mlkit_text_recognition 要求；兼容 groovy/kts 两种 DSL）
-          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' build_tmp/android/app/build.gradle || true
-          sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' build_tmp/android/app/build.gradle || true
-          sed -i 's/minSdk flutter.minSdkVersion/minSdk 24/' build_tmp/android/app/build.gradle || true
-          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' build_tmp/android/app/build.gradle.kts || true
-          sed -i 's/minSdkVersion = flutter.minSdkVersion/minSdkVersion = 24/' build_tmp/android/app/build.gradle.kts || true
-          sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' build_tmp/android/app/build.gradle.kts || true
-          # 5b) compileSdk 36（file_picker 8.x 要求 ≥36；kts 写法 compileSdk = flutter.compileSdkVersion）
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' build_tmp/android/app/build.gradle.kts || true
-          sed -i 's/compileSdkVersion flutter.compileSdkVersion/compileSdkVersion 36/' build_tmp/android/app/build.gradle || true
-          sed -i 's/compileSdk flutter.compileSdkVersion/compileSdk 36/' build_tmp/android/app/build.gradle || true
-          # 5c) targetSdk 同步到 36（避免新旧行为混合的告警与限制）
-          sed -i 's/targetSdk = flutter.targetSdkVersion/targetSdk = 36/' build_tmp/android/app/build.gradle.kts || true
-          sed -i 's/targetSdkVersion flutter.targetSdkVersion/targetSdkVersion 36/' build_tmp/android/app/build.gradle || true
+          # 5) minSdk 24 / compileSdk 36 / targetSdk 36（file_picker 8.x 要求 compileSdk>=36）
+          #    用 python 正则统一替换（兼容 kts 的 `compileSdk = flutter.xxx` 与 groovy 的 `compileSdkVersion flutter.xxx`）
+          python3 ci/patch_sdk_versions.py build_tmp/android/app
           # 6) 关闭 R8 混淆/资源压缩：第三方插件的反射代码导致 minifyReleaseWithR8 失败
           #    个人内网应用无需混淆，换取构建稳定（APK 体积略大）
           #    脚本自动探测 build.gradle（Groovy）与 build.gradle.kts（Kotlin DSL，2026 stable 默认）
           python3 ci/disable_minify.py build_tmp/android/app
-          ls -la build_tmp/android/app/ | grep -E 'build.gradle'
+          ls -la build_tmp/android/app/ | grep -E 'build.gradle' || true
           grep -n 'minifyEnabled\|shrinkResources\|isMinifyEnabled\|isShrinkResources' \
             build_tmp/android/app/build.gradle build_tmp/android/app/build.gradle.kts 2>/dev/null \
             || echo '（未找到 minify 配置行，将继续）'
