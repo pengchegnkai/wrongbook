@@ -95,18 +95,29 @@ jobs:
       - name: 插件子项目 compileSdk 统一 36（lifecycle AAR metadata 要求）
         run: |
           PUB_CACHE_DIR="${PUB_CACHE:-$HOME/.pub-cache}"
-          # 所有插件 android 工程的 compileSdk 都写死为 36（原为 flutter.compileSdkVersion=34/35，
-          # 而 flutter_plugin_android_lifecycle 新版 AAR metadata 要求依赖方 compileSdk>=36）
-          grep -rl 'compileSdkVersion\|compileSdk' "$PUB_CACHE_DIR/hosted/pub.dev"/*/android/build.gradle* 2>/dev/null | while IFS= read -r f; do
+          # file_picker 等插件用硬编码数字（compileSdkVersion 34）而非 flutter 变量，
+          # 因此同时匹配：数字 / flutter 变量 / 等号写法，全部统一到 36（minSdk 统一 24）
+          grep -rl 'compileSdk' "$PUB_CACHE_DIR/hosted/pub.dev"/*/android/build.gradle* 2>/dev/null | while IFS= read -r f; do
             sed -i \
+              -e 's/compileSdkVersion 3[0-9]/compileSdkVersion 36/' \
+              -e 's/compileSdkVersion = 3[0-9]/compileSdkVersion = 36/' \
+              -e 's/compileSdk 3[0-9]\b/compileSdk 36/' \
+              -e 's/compileSdk = 3[0-9]\b/compileSdk = 36/' \
+              -e 's/compileSdkVersion flutter\.compileSdkVersion/compileSdkVersion 36/' \
               -e 's/compileSdk flutter\.compileSdkVersion/compileSdk 36/' \
               -e 's/compileSdk = flutter\.compileSdkVersion/compileSdk = 36/' \
-              -e 's/minSdk flutter\.minSdkVersion/minSdk 24/' \
-              -e 's/minSdk = flutter\.minSdkVersion/minSdk = 24/' \
+              -e 's/minSdkVersion 2[0-9]/minSdkVersion 24/' \
+              -e 's/minSdk = 2[0-9]\b/minSdk = 24/' \
               "$f" || true
           done
-          CHANGED=$(grep -rl 'compileSdk 36\|compileSdk = 36' "$PUB_CACHE_DIR/hosted/pub.dev"/*/android/build.gradle* 2>/dev/null | wc -l)
-          echo "已修改插件数: $CHANGED"
+          # 诊断：直接把 file_picker 与 lifecycle 的 compileSdk 行注解带出
+          grep -rn 'compileSdk' "$PUB_CACHE_DIR/hosted/pub.dev"/file_picker-*/android/build.gradle 2>/dev/null | head -3 | while IFS= read -r line; do
+            echo "::error::FP ${line:0:180}"
+          done
+          grep -rn 'compileSdk' "$PUB_CACHE_DIR/hosted/pub.dev"/flutter_plugin_android_lifecycle-*/android/build.gradle 2>/dev/null | head -3 | while IFS= read -r line; do
+            echo "::error::LC ${line:0:180}"
+          done
+          echo "done"
 
       - name: flutter analyze（输出存档，不阻塞）
         working-directory: build_tmp
