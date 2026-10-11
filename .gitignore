@@ -7,13 +7,13 @@ server/.env
 
 # ===== 模型文件（GB 级，绝不入库）=====
 *.gguf
-models/
+/models/
 
 # ===== 运行时产物 =====
 server/node_modules/
 node_modules/
-logs/
-backups/
+/logs/
+/backups/
 *.log
 
 # ===== 数据库备份与导出 =====
