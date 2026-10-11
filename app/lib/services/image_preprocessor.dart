@@ -10,8 +10,9 @@ class ImagePreprocessor {
   Future<File> preprocess(File input) async {
     final bytes = await input.readAsBytes();
     const maxSide = 1600;
+    final buffer = await ui.ImmutableBuffer.fromUint8List(bytes);
     final codec = await ui.instantiateImageCodecWithSize(
-      bytes,
+      buffer,
       getTargetSize: (int w, int h) {
         if (w <= maxSide && h <= maxSide) {
           return ui.TargetImageSize(width: w, height: h);
@@ -24,6 +25,7 @@ class ImagePreprocessor {
     final frame = await codec.getNextFrame();
     final data = await frame.image.toByteData(format: ui.ImageByteFormat.png);
     codec.dispose();
+    buffer.dispose();
 
     final dir = input.parent.path;
     final out = File('$dir/preprocessed_${DateTime.now().millisecondsSinceEpoch}.png');
