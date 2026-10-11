@@ -1,6 +1,4 @@
 /// services/auth_service.dart —— 注册/登录/刷新
-import 'dart:convert';
-import 'package:crypto/crypto.dart' as crypto;
 import '../core/api_client.dart';
 import '../models/user.dart';
 

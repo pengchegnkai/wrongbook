@@ -49,7 +49,7 @@ class _AiProfilePageState extends ConsumerState<AiProfilePage> {
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             decoration: const InputDecoration(labelText: '解释风格', border: OutlineInputBorder()),
-            initialValue: p?.preferredExplanationStyle,
+            value: p?.preferredExplanationStyle,
             items: const [
               DropdownMenuItem(value: 'step_by_step', child: Text('分步讲解')),
               DropdownMenuItem(value: 'concise', child: Text('简洁')),

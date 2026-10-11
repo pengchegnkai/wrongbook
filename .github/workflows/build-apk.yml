@@ -84,10 +84,13 @@ jobs:
             tail -n 30 analyze.log 2>/dev/null || echo '（analyze.log 不存在）'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          # ::error:: 注解会进入 check-run output.annotations（匿名 API 可读）
-          tail -n 40 build.log 2>/dev/null | grep -E 'error|Error|FAILURE|Exception' | head -15 | while IFS= read -r line; do
-            echo "::error::${line:0:200}"
-          done || true
+          # ::error:: 注解会进入 check-run annotations（匿名 API 可读）；无条件输出避免 0 注解盲区
+          tail -n 25 build.log 2>/dev/null | while IFS= read -r line; do
+            echo "::error::B ${line:0:180}"
+          done
+          tail -n 10 analyze.log 2>/dev/null | while IFS= read -r line; do
+            echo "::error::A ${line:0:180}"
+          done
           echo "done"
 
       - name: Rename APK with short commit
