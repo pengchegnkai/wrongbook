@@ -46,6 +46,20 @@ jobs:
           sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 24/' build_tmp/android/app/build.gradle || true
           sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 24/' build_tmp/android/app/build.gradle || true
           sed -i 's/minSdk flutter.minSdkVersion/minSdk 24/' build_tmp/android/app/build.gradle || true
+          # 6) 关闭 R8 混淆/资源压缩：第三方插件的反射代码导致 minifyReleaseWithR8 失败
+          #    个人内网应用无需混淆，换取构建稳定（APK 体积略大）
+          sed -i 's/minifyEnabled true/minifyEnabled false/' build_tmp/android/app/build.gradle || true
+          if ! grep -q 'minifyEnabled' build_tmp/android/app/build.gradle; then
+            python3 - <<'PYEOF'
+import re
+p = 'build_tmp/android/app/build.gradle'
+s = open(p).read()
+if 'minifyEnabled' not in s:
+    s = s.replace('release {', 'release {\n            minifyEnabled false\n            shrinkResources false', 1)
+    open(p, 'w').write(s)
+PYEOF
+          fi
+          grep -n 'minifyEnabled\|shrinkResources' build_tmp/android/app/build.gradle || echo '（未找到 minify 配置行，将继续）'
 
       - name: flutter pub get
         working-directory: build_tmp
