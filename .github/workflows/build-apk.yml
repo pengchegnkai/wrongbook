@@ -50,6 +50,39 @@ jobs:
           #    脚本自动探测 build.gradle（Groovy）与 build.gradle.kts（Kotlin DSL，2026 stable 默认）
           python3 ci/disable_minify.py build_tmp/android/app
           ls -la build_tmp/android/app/ | grep -E 'build.gradle' || true
+          # 7) 子模块 compileSdk 强制提升到 36：
+          #    flutter_plugin_android_lifecycle 的 AAR metadata 要求 compileSdk>=36，
+          #    而插件子模块的 compileSdk 由 Flutter 工具自动设为 flutter.compileSdkVersion（34/35），
+          #    不继承 app 模块设置。反射调用 setCompileSdk，兼容 app 自身与全部插件子模块。
+          if [ -f build_tmp/android/build.gradle.kts ]; then
+            printf '%s\n' \
+              '' \
+              '// CI: 子模块 compileSdk 统一提升到 36（flutter_plugin_android_lifecycle AAR metadata 要求）' \
+              'subprojects {' \
+              '    afterEvaluate {' \
+              '        val androidExt = extensions.findByName("android") ?: return@afterEvaluate' \
+              '        val setter = androidExt.javaClass.methods.firstOrNull { it.name == "setCompileSdk" }' \
+              '        if (setter != null) {' \
+              '            try { setter.invoke(androidExt, "36") } catch (e: Exception) { println("compileSdk bump failed: $e") }' \
+              '        }' \
+              '    }' \
+              '}' \
+              >> build_tmp/android/build.gradle.kts
+          elif [ -f build_tmp/android/build.gradle ]; then
+            printf '%s\n' \
+              '' \
+              '// CI: 子模块 compileSdk 统一提升到 36' \
+              'subprojects {' \
+              '    afterEvaluate { project ->' \
+              '        if (project.extensions.findByName("android") != null) {' \
+              '            def androidExt = project.extensions.getByName("android")' \
+              '            def setter = androidExt.class.methods.find { it.name == "setCompileSdk" }' \
+              '            if (setter != null) { try { setter.invoke(androidExt, "36") } catch (Exception e) { println("compileSdk bump failed: $e") } }' \
+              '        }' \
+              '    }' \
+              '}' \
+              >> build_tmp/android/build.gradle
+          fi
           grep -n 'minifyEnabled\|shrinkResources\|isMinifyEnabled\|isShrinkResources' \
             build_tmp/android/app/build.gradle build_tmp/android/app/build.gradle.kts 2>/dev/null \
             || echo '（未找到 minify 配置行，将继续）'
