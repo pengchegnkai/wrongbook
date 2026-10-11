@@ -28,10 +28,7 @@ class SettingsPage extends ConsumerWidget {
           const _Header('AI 与自进化'),
           ListTile(leading: const Icon(Icons.tune), title: const Text('思考强度设置'), onTap: () => context.go('/strength-selector')),
           ListTile(leading: const Icon(Icons.memory), title: const Text('AI 记忆管理'), onTap: () => context.go('/ai-memory')),
-          ListTile(leading: const Icon(Icons.face), title: const Text('AI 学习画像'), onTap: () async {
-            await ref.read(aiMemoryActionsProvider as dynamic);
-            if (context.mounted) context.go('/ai-profile');
-          }),
+          ListTile(leading: const Icon(Icons.face), title: const Text('AI 学习画像'), onTap: () => context.go('/ai-profile')),
           ListTile(leading: const Icon(Icons.dns), title: const Text('本地模型管理'), onTap: () => context.go('/model-manage')),
           const _Header('外观'),
           ListTile(

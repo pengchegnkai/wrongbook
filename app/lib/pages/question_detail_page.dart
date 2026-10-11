@@ -106,7 +106,7 @@ class QuestionDetailPage extends ConsumerWidget {
 
   Future<void> _verify(WidgetRef ref) async {
     try {
-      await ApiClient().post('/verify/${ref.read(questionDetailProvider(id)).value?.id ?? id}');
+      await ApiClient().post('/verify/$id');
       ref.invalidate(questionDetailProvider(id));
     } catch (e) {
       // 错误已在响应中带出；简单吞掉并刷新

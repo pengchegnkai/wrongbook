@@ -7,7 +7,7 @@ ThemeData buildLightTheme() {
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.light),
     appBarTheme: const AppBarTheme(centerTitle: true),
-    cardTheme: CardTheme(elevation: 1, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+    cardTheme: const CardThemeData(elevation: 1, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12)))),
   );
 }
 
@@ -17,6 +17,6 @@ ThemeData buildDarkTheme() {
     useMaterial3: true,
     colorScheme: ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark),
     appBarTheme: const AppBarTheme(centerTitle: true),
-    cardTheme: CardTheme(elevation: 1, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+    cardTheme: const CardThemeData(elevation: 1, shape: RoundedRectangleBorder(borderRadius: BorderRadius.all(Radius.circular(12)))),
   );
 }

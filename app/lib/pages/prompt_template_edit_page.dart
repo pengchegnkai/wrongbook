@@ -70,9 +70,3 @@ class _PromptTemplateEditPageState extends ConsumerState<PromptTemplateEditPage>
     );
   }
 }
-
-extension on PromptTemplate {
-  PromptTemplate copyWithDefault() => PromptTemplate(
-    id: id, name: name, subject: subject, courseType: courseType,
-    questionType: questionType, templateContent: templateContent, isDefault: true);
-}

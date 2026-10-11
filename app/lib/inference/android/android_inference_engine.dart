@@ -4,6 +4,7 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import '../../core/config.dart';
+import '../../core/api_client.dart';
 import '../local_inference_engine.dart';
 import '../inference_request.dart';
 import '../inference_response.dart';
