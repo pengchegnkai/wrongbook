@@ -99,23 +99,25 @@ jobs:
           # 因此同时匹配：数字 / flutter 变量 / 等号写法，全部统一到 36（minSdk 统一 24）
           grep -rl 'compileSdk' "$PUB_CACHE_DIR/hosted/pub.dev"/*/android/build.gradle* 2>/dev/null | while IFS= read -r f; do
             sed -i \
-              -e 's/compileSdkVersion 3[0-9]/compileSdkVersion 36/' \
-              -e 's/compileSdkVersion = 3[0-9]/compileSdkVersion = 36/' \
-              -e 's/compileSdk 3[0-9]\b/compileSdk 36/' \
-              -e 's/compileSdk = 3[0-9]\b/compileSdk = 36/' \
+              -e 's/compileSdkVersion [0-9][0-9]\+/compileSdkVersion 36/' \
+              -e 's/compileSdkVersion = [0-9][0-9]\+/compileSdkVersion = 36/' \
+              -e 's/compileSdk [0-9][0-9]\+/compileSdk 36/' \
+              -e 's/compileSdk = [0-9][0-9]\+/compileSdk = 36/' \
               -e 's/compileSdkVersion flutter\.compileSdkVersion/compileSdkVersion 36/' \
               -e 's/compileSdk flutter\.compileSdkVersion/compileSdk 36/' \
               -e 's/compileSdk = flutter\.compileSdkVersion/compileSdk = 36/' \
+              -e 's/targetSdkVersion [0-9][0-9]\+/targetSdkVersion 36/' \
+              -e 's/targetSdk = [0-9][0-9]\+/targetSdk 36/' \
               -e 's/minSdkVersion 2[0-9]/minSdkVersion 24/' \
               -e 's/minSdk = 2[0-9]\b/minSdk = 24/' \
               "$f" || true
           done
-          # 诊断：直接把 file_picker 与 lifecycle 的 compileSdk 行注解带出
+          # 诊断：直接把 file_picker 与 ML Kit commons 的 compileSdk 行注解带出
           grep -rn 'compileSdk' "$PUB_CACHE_DIR/hosted/pub.dev"/file_picker-*/android/build.gradle 2>/dev/null | head -3 | while IFS= read -r line; do
             echo "::error::FP ${line:0:180}"
           done
-          grep -rn 'compileSdk' "$PUB_CACHE_DIR/hosted/pub.dev"/flutter_plugin_android_lifecycle-*/android/build.gradle 2>/dev/null | head -3 | while IFS= read -r line; do
-            echo "::error::LC ${line:0:180}"
+          grep -rn 'compileSdk' "$PUB_CACHE_DIR/hosted/pub.dev"/google_mlkit_commons-*/android/build.gradle 2>/dev/null | head -3 | while IFS= read -r line; do
+            echo "::error::MK ${line:0:180}"
           done
           echo "done"
 
