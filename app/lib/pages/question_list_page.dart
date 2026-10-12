@@ -43,7 +43,7 @@ class _QuestionListPageState extends ConsumerState<QuestionListPage> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => context.go('/scan'),
+        onPressed: () => context.push('/scan'),
         child: const Icon(Icons.camera_alt),
       ),
       body: Column(children: [

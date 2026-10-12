@@ -31,7 +31,7 @@ class ReviewCalendarPage extends ConsumerWidget {
         title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         subtitle: items.isEmpty ? const Text('无') : Text(items.take(3).map((q) => q.originalQuestion).join(' / '), maxLines: 2, overflow: TextOverflow.ellipsis),
         trailing: items.isEmpty ? null : Chip(label: Text('${items.length} 题')),
-        onTap: items.isEmpty ? null : () => context.go('/review'),
+        onTap: items.isEmpty ? null : () => context.push('/review'),
       ),
     );
   }

@@ -18,7 +18,7 @@ class HomePage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('错题本'), actions: [
-        IconButton(icon: const Icon(Icons.settings), onPressed: () => context.go('/settings')),
+        IconButton(icon: const Icon(Icons.settings), onPressed: () => context.push('/settings')),
       ]),
       body: RefreshIndicator(
         onRefresh: () async => ref.invalidate(overviewStatsProvider),
@@ -59,15 +59,15 @@ class HomePage extends ConsumerWidget {
               ]),
               const SizedBox(height: 20),
               Wrap(spacing: 12, runSpacing: 12, children: [
-                ActionChip(label: const Text('错题列表'), avatar: const Icon(Icons.list), onPressed: () => context.go('/questions')),
-                ActionChip(label: const Text('复习'), avatar: const Icon(Icons.school), onPressed: () => context.go('/review')),
-                ActionChip(label: const Text('拍照录题'), avatar: const Icon(Icons.camera_alt), onPressed: () => context.go('/scan')),
-                ActionChip(label: const Text('AI 分析'), avatar: const Icon(Icons.psychology), onPressed: () => context.go('/prompt-templates')),
-                ActionChip(label: const Text('图表'), avatar: const Icon(Icons.bar_chart), onPressed: () => context.go('/charts')),
-                ActionChip(label: const Text('知识点图谱'), avatar: const Icon(Icons.account_tree), onPressed: () => context.go('/knowledge-graph')),
-                ActionChip(label: const Text('复习日历'), avatar: const Icon(Icons.calendar_month), onPressed: () => context.go('/review-calendar')),
-                ActionChip(label: const Text('导入导出'), avatar: const Icon(Icons.import_export), onPressed: () => context.go('/import-export')),
-                ActionChip(label: const Text('AI 记忆'), avatar: const Icon(Icons.memory), onPressed: () => context.go('/ai-memory')),
+                ActionChip(label: const Text('错题列表'), avatar: const Icon(Icons.list), onPressed: () => context.push('/questions')),
+                ActionChip(label: const Text('复习'), avatar: const Icon(Icons.school), onPressed: () => context.push('/review')),
+                ActionChip(label: const Text('拍照录题'), avatar: const Icon(Icons.camera_alt), onPressed: () => context.push('/scan')),
+                ActionChip(label: const Text('AI 分析'), avatar: const Icon(Icons.psychology), onPressed: () => context.push('/prompt-templates')),
+                ActionChip(label: const Text('图表'), avatar: const Icon(Icons.bar_chart), onPressed: () => context.push('/charts')),
+                ActionChip(label: const Text('知识点图谱'), avatar: const Icon(Icons.account_tree), onPressed: () => context.push('/knowledge-graph')),
+                ActionChip(label: const Text('复习日历'), avatar: const Icon(Icons.calendar_month), onPressed: () => context.push('/review-calendar')),
+                ActionChip(label: const Text('导入导出'), avatar: const Icon(Icons.import_export), onPressed: () => context.push('/import-export')),
+                ActionChip(label: const Text('AI 记忆'), avatar: const Icon(Icons.memory), onPressed: () => context.push('/ai-memory')),
               ]),
             ],
           ),

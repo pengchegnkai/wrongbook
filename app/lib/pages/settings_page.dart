@@ -17,19 +17,19 @@ class SettingsPage extends ConsumerWidget {
       body: ListView(
         children: [
           const _Header('账号'),
-          ListTile(leading: const Icon(Icons.person), title: Text(user?.nickname ?? user?.username ?? '未登录'), onTap: () => context.go('/profile')),
-          ListTile(leading: const Icon(Icons.devices), title: const Text('登录设备管理'), onTap: () => context.go('/devices')),
+          ListTile(leading: const Icon(Icons.person), title: Text(user?.nickname ?? user?.username ?? '未登录'), onTap: () => context.push('/profile')),
+          ListTile(leading: const Icon(Icons.devices), title: const Text('登录设备管理'), onTap: () => context.push('/devices')),
           ListTile(leading: const Icon(Icons.logout), title: const Text('退出登录'), onTap: () async {
             await ref.read(currentUserProvider.notifier).logout();
             if (context.mounted) context.go('/login');
           }),
           const _Header('服务器'),
-          ListTile(leading: const Icon(Icons.dns), title: const Text('服务器配置'), onTap: () => context.go('/server-config')),
+          ListTile(leading: const Icon(Icons.dns), title: const Text('服务器配置'), onTap: () => context.push('/server-config')),
           const _Header('AI 与自进化'),
-          ListTile(leading: const Icon(Icons.tune), title: const Text('思考强度设置'), onTap: () => context.go('/strength-selector')),
-          ListTile(leading: const Icon(Icons.memory), title: const Text('AI 记忆管理'), onTap: () => context.go('/ai-memory')),
-          ListTile(leading: const Icon(Icons.face), title: const Text('AI 学习画像'), onTap: () => context.go('/ai-profile')),
-          ListTile(leading: const Icon(Icons.dns), title: const Text('本地模型管理'), onTap: () => context.go('/model-manage')),
+          ListTile(leading: const Icon(Icons.tune), title: const Text('思考强度设置'), onTap: () => context.push('/strength-selector')),
+          ListTile(leading: const Icon(Icons.memory), title: const Text('AI 记忆管理'), onTap: () => context.push('/ai-memory')),
+          ListTile(leading: const Icon(Icons.face), title: const Text('AI 学习画像'), onTap: () => context.push('/ai-profile')),
+          ListTile(leading: const Icon(Icons.dns), title: const Text('本地模型管理'), onTap: () => context.push('/model-manage')),
           const _Header('外观'),
           ListTile(
             leading: const Icon(Icons.dark_mode),
@@ -45,7 +45,7 @@ class SettingsPage extends ConsumerWidget {
             ),
           ),
           const _Header('数据'),
-          ListTile(leading: const Icon(Icons.import_export), title: const Text('导入导出'), onTap: () => context.go('/import-export')),
+          ListTile(leading: const Icon(Icons.import_export), title: const Text('导入导出'), onTap: () => context.push('/import-export')),
           const _Header('隐私'),
           const ListTile(leading: Icon(Icons.lock), title: Text('数据隔离说明'),
             subtitle: Text('所有数据按账号隔离：错题、AI 记忆、检索与导出均只含当前账号数据', style: TextStyle(fontSize: 12))),

@@ -2,7 +2,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import '../providers/ocr_provider.dart';
 import '../providers/auto_understand_provider.dart';
@@ -28,7 +27,6 @@ class _AiUnderstandPageState extends ConsumerState<AiUnderstandPage> {
       return;
     }
     await ref.read(autoUnderstandProvider.notifier).understand(ocr.originalQuestion + '\n' + (ocr.myAnswer ?? ''));
-    if (mounted) context.go('/ai-understand-review-placeholder'.replaceAll('-placeholder', ''));
   }
 
   @override

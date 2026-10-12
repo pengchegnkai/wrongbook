@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import '../core/config.dart';
 import '../services/server_discovery_service.dart';
@@ -30,6 +31,8 @@ class _ServerConfigPageState extends ConsumerState<ServerConfigPage> {
     if (url.isEmpty) return;
     final normalized = url.startsWith('http') ? url : 'http://$url';
     AppConfig.setBaseUrl(normalized);
+    // 持久化：重启后 main.dart 会自动恢复，无需重输
+    await Hive.box('settings').put('baseUrl', normalized);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已保存：${AppConfig.baseUrl}')));
       context.go('/login');

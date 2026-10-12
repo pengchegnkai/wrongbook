@@ -46,7 +46,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
             OutlinedButton.icon(icon: const Icon(Icons.photo), label: const Text('从相册选择'), onPressed: _busy ? null : () => _pick(ImageSource.gallery)),
             const SizedBox(height: 12),
             TextButton.icon(icon: const Icon(Icons.psychology), label: const Text('AI 自动理解（拍照→分区草稿）'),
-              onPressed: () => context.go('/ai-understand')),
+              onPressed: () => context.push('/ai-understand')),
             if (_ocrText.isNotEmpty) Padding(padding: const EdgeInsets.all(12), child: Text(_ocrText)),
           ],
         ),
