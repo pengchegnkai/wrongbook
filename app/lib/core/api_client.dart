@@ -53,15 +53,17 @@ class ApiClient {
   }
 }
 
-/// 鉴权拦截器：附 token；401 时用 refreshToken 刷新一次并重试
+/// 鉴权拦截器：附 token；401 时用 refreshToken 刷新一次并重试（仅一次，防死循环）
 class AuthInterceptor extends Interceptor {
   final Dio _dio;
   AuthInterceptor(this._dio);
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    final access = TokenStorage.accessToken;
-    if (access != null) {
+    // 必须用同步缓存：accessToken 是 Future，未 await 时永远非 null，
+    // 会把 "Bearer Instance of Future..." 塞进请求头导致全部 401
+    final access = TokenStorage.accessTokenSync;
+    if (access != null && access.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $access';
     }
     handler.next(options);
@@ -70,10 +72,24 @@ class AuthInterceptor extends Interceptor {
   @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
     if (err.response?.statusCode == 401) {
+      // 已重试过仍 401：token 彻底失效，清凭据终止循环
+      if (err.requestOptions.extra['authRetried'] == true) {
+        await TokenStorage.clear();
+        return handler.next(err);
+      }
       final refreshed = await AuthService.tryRefresh();
       if (refreshed) {
-        final retry = await _dio.fetch(err.requestOptions);
-        return handler.resolve(retry);
+        err.requestOptions.extra['authRetried'] = true;
+        final access = TokenStorage.accessTokenSync;
+        if (access != null && access.isNotEmpty) {
+          err.requestOptions.headers['Authorization'] = 'Bearer $access';
+        }
+        try {
+          final retry = await _dio.fetch(err.requestOptions);
+          return handler.resolve(retry);
+        } on DioException catch (e) {
+          return handler.next(e);
+        }
       }
       await TokenStorage.clear();
     }

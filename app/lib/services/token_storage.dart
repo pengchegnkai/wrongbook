@@ -28,6 +28,9 @@ class TokenStorage {
   }
 
   static Future<bool> hasTokens() async {
-    return (await accessToken) != null;
+    final a = await accessToken;
+    // 重启后同步缓存为空，这里顺便灌入，拦截器才能同步取到
+    _accessCache = a;
+    return a != null;
   }
 }
