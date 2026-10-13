@@ -149,26 +149,24 @@ jobs:
             echo '```'
             tail -n 60 build.log 2>/dev/null || echo '（build.log 不存在）'
             echo '```'
-            echo "## analyze.log 末尾 30 行"
+            echo "## analyze.log 末尾 40 行"
             echo '```'
-            tail -n 30 analyze.log 2>/dev/null || echo '（analyze.log 不存在）'
+            tail -n 40 analyze.log 2>/dev/null || echo '（analyze.log 不存在）'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          # ::error:: 注解会进入 check-run annotations（匿名 API 可读）
-          # gradle 失败原因在 "What went wrong" 段落（日志中部），尾部只有警告文本
+          # 文件自检：确认日志存在与大小（匿名 API 可读）
+          echo "::error::LS $(ls -la build.log analyze.log 2>/dev/null | awk '{print $5, $9}' | tr '\n' ' ')"
+          # gradle 失败原因在 "What went wrong" 段落（日志中部）
           awk '/What went wrong/{f=1} f{print; n++} n>14{exit}' build.log 2>/dev/null | while IFS= read -r line; do
             echo "::error::W ${line:0:180}"
           done
-          grep -n -E 'FAILURE:|Task .*(failed|not found)|Caused by|Missing class|R8:' build.log 2>/dev/null | head -12 | while IFS= read -r line; do
-            echo "::error::E ${line:0:180}"
-          done
-          # Dart 编译错误行（compileFlutterBuildRelease 阶段，错误在日志中部）
-          grep -E '\[Error\]|^Error:|Error: |Error \(|Target of URI|doesn.t exist|isn.t defined|undefined (class|method|get|identifier)|The named (parameter|argument)|Required.*missing|extends (a non|an invalid)|isn.t a (valid|subtype|const)|Const.*variable|Local variable|A value of type' build.log 2>/dev/null \
-            | sort -u | head -40 | while IFS= read -r line; do
+          # 宽网提取：大小写不敏感的全部错误相关行（去重，限 50 条）
+          grep -inE 'error|exception|failed|cannot|unable|missing|undefined|bad state|segfault|abort' build.log 2>/dev/null \
+            | sort -u -t: -k2 | head -50 | while IFS= read -r line; do
               echo "::error::D ${line:0:200}"
             done
-          # analyze.log 里的错误行（flutter analyze 单独运行过）
-          grep -E '^\s*error ' analyze.log 2>/dev/null | head -40 | while IFS= read -r line; do
+          # analyze.log 尾部全量（Dart 静态错误清单）
+          tail -n 60 analyze.log 2>/dev/null | while IFS= read -r line; do
             echo "::error::A ${line:0:200}"
           done
           echo "done"
