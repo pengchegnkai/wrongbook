@@ -29,9 +29,8 @@ dependencies:
   file_picker: ^8.0.0
   share_plus: ^7.2.1
   path_provider: ^2.1.1
-  # 图片 / OCR
+  # 图片（OCR 已改为服务端 Tesseract，不再引入 ML Kit 原生插件）
   image_picker: ^1.0.5
-  google_mlkit_text_recognition: ^0.11.0
   # 服务发现
   multicast_dns: ^0.3.2
 

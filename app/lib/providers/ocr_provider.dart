@@ -1,31 +1,46 @@
-/// providers/ocr_provider.dart —— OCR 流程状态
-import 'dart:io';
+/// providers/ocr_provider.dart —— OCR 流程状态（服务端 OCR：上传图片 → Termux Tesseract 识别）
+/// 客户端不再做本地识别，只做「上传 → 展示 → 校对 → 保存」。
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../services/offline_first_pipeline.dart';
-import '../services/local_question_parser.dart';
+import '../services/ocr_api_service.dart';
 
-enum OcrStage { idle, preprocessing, recognizing, parsing, done, error }
+enum OcrStage { idle, uploading, done, error }
 
 class OcrState {
   final OcrStage stage;
-  final ParsedDraft? draft;
+  final OcrResult? result;
   final String? error;
-  const OcrState({this.stage = OcrStage.idle, this.draft, this.error});
+  final String? imagePath;
+  const OcrState({this.stage = OcrStage.idle, this.result, this.error, this.imagePath});
 }
 
 class OcrNotifier extends StateNotifier<OcrState> {
-  final OfflineFirstPipeline _pipeline = OfflineFirstPipeline();
-
+  final OcrApiService _service = OcrApiService();
   OcrNotifier() : super(const OcrState());
 
-  Future<void> processImage(File image) async {
-    state = const OcrState(stage: OcrStage.recognizing);
+  /// 上传识别。重复调用会覆盖旧状态。
+  Future<void> recognize(String imagePath) async {
+    state = OcrState(stage: OcrStage.uploading, imagePath: imagePath);
     try {
-      final draft = await _pipeline.draftFromImage(image);
-      state = OcrState(stage: OcrStage.done, draft: draft);
+      final result = await _service.recognize(imagePath);
+      if (result.rawText.isEmpty) {
+        state = OcrState(
+          stage: OcrStage.error,
+          imagePath: imagePath,
+          error: '未识别到文字。请确认图片清晰、文字在画面主体位置后重试',
+        );
+        return;
+      }
+      state = OcrState(stage: OcrStage.done, result: result, imagePath: imagePath);
     } catch (e) {
-      state = OcrState(stage: OcrStage.error, error: e.toString());
+      state = OcrState(stage: OcrStage.error, imagePath: imagePath, error: friendlyOcrError(e));
     }
+  }
+
+  /// 重试（用同一张图重新上传）
+  Future<void> retry() async {
+    final path = state.imagePath;
+    if (path == null) return;
+    await recognize(path);
   }
 
   void reset() => state = const OcrState();

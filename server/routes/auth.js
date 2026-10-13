@@ -1,14 +1,10 @@
 // routes/auth.js —— 注册/登录/刷新/设备管理
 const express = require('express');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
 const { query } = require('../db');
+const tokens = require('../services/tokenService');
 
 const router = express.Router();
-const JWT_SECRET = () => process.env.JWT_SECRET || 'CHANGE_ME';
-const ACCESS_TTL = '30m';
-const REFRESH_DAYS = 30;
 
 // 登录限流：同 IP 5 次失败锁定 15 分钟（内存版，重启即清）
 const failedMap = new Map();
@@ -24,26 +20,11 @@ function recordFail(ip) {
   rec.count++; failedMap.set(ip, rec);
 }
 
-function signAccess(user) {
-  return jwt.sign({ uid: user.id, username: user.username }, JWT_SECRET(), { expiresIn: ACCESS_TTL });
-}
-
-function hashToken(t) { return crypto.createHash('sha256').update(t).digest('hex'); }
-
 async function logAction(userId, action, req, success, message) {
   await query(
     'INSERT INTO login_logs (user_id, action, ip, device_info, success, message) VALUES ($1,$2,$3,$4,$5,$6)',
     [userId, action, req.ip, req.headers['user-agent'] || '', success, message || '']
   );
-}
-
-async function issueRefresh(userId, req) {
-  const raw = crypto.randomBytes(48).toString('hex');
-  await query(
-    'INSERT INTO refresh_tokens (user_id, token_hash, device_info, ip, expires_at) VALUES ($1,$2,$3,$4, now() + interval \'30 days\')',
-    [userId, hashToken(raw), req.headers['user-agent'] || '', req.ip]
-  );
-  return raw;
 }
 
 router.post('/register', async (req, res, next) => {
@@ -60,8 +41,8 @@ router.post('/register', async (req, res, next) => {
     );
     await query('INSERT INTO user_settings (user_id) VALUES ($1) ON CONFLICT DO NOTHING', [r.rows[0].id]);
     await query('INSERT INTO user_ai_profile (user_id) VALUES ($1) ON CONFLICT DO NOTHING', [r.rows[0].id]);
-    const accessToken = signAccess(r.rows[0]);
-    const refreshToken = await issueRefresh(r.rows[0].id, req);
+    const accessToken = tokens.signAccess(r.rows[0]);
+    const refreshToken = await tokens.issueRefresh(r.rows[0].id, req);
     await logAction(r.rows[0].id, 'register', req, true);
     res.json({ code: 0, data: { user: r.rows[0], accessToken, refreshToken }, message: 'ok' });
   } catch (e) { next(e); }
@@ -81,8 +62,8 @@ router.post('/login', async (req, res, next) => {
     }
     if (user.status !== 'active') return res.status(403).json({ code: 403, data: null, message: '账号已被禁用' });
     await query('UPDATE users SET last_login_at=now() WHERE id=$1', [user.id]);
-    const accessToken = signAccess(user);
-    const refreshToken = await issueRefresh(user.id, req);
+    const accessToken = tokens.signAccess(user);
+    const refreshToken = await tokens.issueRefresh(user.id, req);
     await logAction(user.id, 'login', req, true);
     res.json({ code: 0, data: { user: { id: user.id, username: user.username, nickname: user.nickname, role: user.role }, accessToken, refreshToken }, message: 'ok' });
   } catch (e) { next(e); }
@@ -92,25 +73,17 @@ router.post('/refresh', async (req, res, next) => {
   try {
     const { refreshToken } = req.body || {};
     if (!refreshToken) return res.status(400).json({ code: 400, data: null, message: '缺少 refreshToken' });
-    const h = hashToken(refreshToken);
-    const r = await query(
-      'SELECT rt.id, rt.user_id, u.username, u.status FROM refresh_tokens rt JOIN users u ON u.id=rt.user_id WHERE rt.token_hash=$1 AND rt.revoked=false AND rt.expires_at > now()',
-      [h]
-    );
-    if (!r.rows.length) return res.status(401).json({ code: 401, data: null, message: 'refresh token 无效' });
-    const row = r.rows[0];
-    if (row.status !== 'active') return res.status(403).json({ code: 403, data: null, message: '账号已被禁用' });
-    // 旧 token 吊销 + 换发新 token（轮换）
-    await query('UPDATE refresh_tokens SET revoked=true WHERE id=$1', [row.id]);
-    const newRefresh = await issueRefresh(row.user_id, req);
-    res.json({ code: 0, data: { accessToken: signAccess(row), refreshToken: newRefresh }, message: 'ok' });
+    const result = await tokens.rotateRefresh(refreshToken, req);
+    if (!result) return res.status(401).json({ code: 401, data: null, message: 'refresh token 无效' });
+    if (result.status !== 'active') return res.status(403).json({ code: 403, data: null, message: '账号已被禁用' });
+    res.json({ code: 0, data: { accessToken: result.accessToken, refreshToken: result.refreshToken }, message: 'ok' });
   } catch (e) { next(e); }
 });
 
 router.post('/logout', async (req, res, next) => {
   try {
     const { refreshToken } = req.body || {};
-    if (refreshToken) await query('UPDATE refresh_tokens SET revoked=true WHERE token_hash=$1', [hashToken(refreshToken)]);
+    await tokens.revokeRefresh(refreshToken);
     await logAction(req.userId, 'logout', req, true);
     res.json({ code: 0, data: null, message: 'ok' });
   } catch (e) { next(e); }
@@ -141,7 +114,7 @@ router.post('/change-password', async (req, res, next) => {
     }
     if (!newPassword || String(newPassword).length < 6) return res.status(400).json({ code: 400, data: null, message: '新密码至少 6 位' });
     await query('UPDATE users SET password_hash=$1, updated_at=now() WHERE id=$2', [bcrypt.hashSync(newPassword, 10), req.userId]);
-    await query('UPDATE refresh_tokens SET revoked=true WHERE user_id=$1', [req.userId]);
+    await tokens.revokeAllForUser(req.userId);
     await logAction(req.userId, 'change-password', req, true);
     res.json({ code: 0, data: null, message: '密码已修改，其他设备已下线' });
   } catch (e) { next(e); }

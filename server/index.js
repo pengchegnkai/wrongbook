@@ -51,6 +51,7 @@ app.use('/api/ai', auth, require('./routes/ai'));
 app.use('/api/prompt-templates', auth, require('./routes/promptTemplates'));
 app.use('/api/analysis', auth, require('./routes/analysisStrength'));
 app.use('/api/ai-memory', auth, require('./routes/aiMemory'));
+app.use('/api/ocr', auth, require('./routes/ocr'));
 
 // 统一错误处理：不抛原始堆栈
 app.use((err, req, res, next) => {

@@ -1,6 +1,8 @@
-/// core/api_client.dart —— Dio 封装：baseUrl 动态、token 自动附加、401 自动刷新
+/// core/api_client.dart —— Dio 封装：baseUrl 动态、token 自动附加、401 自动刷新（并发安全）、网络状态回调
+import 'dart:async';
 import 'package:dio/dio.dart';
 import 'config.dart';
+import '../providers/network_provider.dart';
 import '../services/auth_service.dart';
 import '../services/token_storage.dart';
 
@@ -53,15 +55,26 @@ class ApiClient {
   }
 }
 
-/// 鉴权拦截器：附 token；401 时用 refreshToken 刷新一次并重试（仅一次，防死循环）
+/// 鉴权拦截器：
+/// - onRequest 附 Bearer token（同步缓存，未 await 的 Future 绝不能塞进请求头）
+/// - 401 自动用 refreshToken 换新 token 并重试原请求：
+///   * Completer 防止并发 401 触发多次刷新
+///   * authRetried 标记只重试一次，防死循环
+///   * /auth/ 路径不自动刷新（登录/刷新接口自身的 401 直接透传）
+/// - 连接失败/超时：只标记离线，不清 token（断网 ≠ 未登录）
 class AuthInterceptor extends Interceptor {
   final Dio _dio;
+  Completer<bool>? _refreshing;
   AuthInterceptor(this._dio);
+
+  static bool _isNetworkError(DioExceptionType t) =>
+      t == DioExceptionType.connectionError ||
+      t == DioExceptionType.connectionTimeout ||
+      t == DioExceptionType.sendTimeout ||
+      t == DioExceptionType.receiveTimeout;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
-    // 必须用同步缓存：accessToken 是 Future，未 await 时永远非 null，
-    // 会把 "Bearer Instance of Future..." 塞进请求头导致全部 401
     final access = TokenStorage.accessTokenSync;
     if (access != null && access.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $access';
@@ -70,14 +83,41 @@ class AuthInterceptor extends Interceptor {
   }
 
   @override
+  void onResponse(Response<dynamic> response, ResponseInterceptorHandler handler) {
+    NetworkStatus.setOffline(false);
+    handler.next(response);
+  }
+
+  @override
   void onError(DioException err, ErrorInterceptorHandler handler) async {
-    if (err.response?.statusCode == 401) {
+    // 网络失败：标记离线并透传，绝不视为未登录
+    if (_isNetworkError(err.type)) {
+      NetworkStatus.setOffline(true);
+      return handler.next(err);
+    }
+    final path = err.requestOptions.path;
+    if (err.response?.statusCode == 401 && !path.contains('/auth/')) {
       // 已重试过仍 401：token 彻底失效，清凭据终止循环
       if (err.requestOptions.extra['authRetried'] == true) {
-        await TokenStorage.clear();
+        await TokenStorage.clearAll();
         return handler.next(err);
       }
-      final refreshed = await AuthService.tryRefresh();
+      final bool refreshed;
+      if (_refreshing != null) {
+        // 并发 401：等待第一次刷新完成，共用其结果
+        refreshed = await _refreshing!.future;
+      } else {
+        final completer = Completer<bool>();
+        _refreshing = completer;
+        try {
+          refreshed = await AuthService.tryRefresh();
+        } catch (_) {
+          refreshed = false;
+        } finally {
+          completer.complete(refreshed);
+          _refreshing = null;
+        }
+      }
       if (refreshed) {
         err.requestOptions.extra['authRetried'] = true;
         final access = TokenStorage.accessTokenSync;
@@ -91,7 +131,7 @@ class AuthInterceptor extends Interceptor {
           return handler.next(e);
         }
       }
-      await TokenStorage.clear();
+      await TokenStorage.clearAll();
     }
     handler.next(err);
   }

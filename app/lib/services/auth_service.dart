@@ -1,45 +1,98 @@
-/// services/auth_service.dart —— 注册/登录/刷新
+/// services/auth_service.dart —— 注册 / 登录 / 刷新 / 自动登录
 import '../core/api_client.dart';
 import '../models/user.dart';
 import 'token_storage.dart';
 
 class AuthService {
-  /// 登录。成功返回 User 并保存 token。
-  static Future<User> login(String username, String password) async {
-    final data = await ApiClient().post('/auth/login', body: {'username': username, 'password': password});
-    await TokenStorage.saveTokens(data['accessToken'], data['refreshToken']);
-    return User.fromJson(data['user']);
+  /// 登录。rememberMe=false 表示下次启动不自动登录。
+  static Future<User> login(String username, String password, {bool rememberMe = true}) async {
+    final data = await ApiClient().post('/auth/login', body: {'username': username, 'password': password}) as Map;
+    final user = User.fromJson(data['user']);
+    await TokenStorage.saveSession(
+      access: data['accessToken'] as String,
+      refresh: data['refreshToken'] as String,
+      userId: user.id,
+      username: user.username,
+      rememberMe: rememberMe,
+    );
+    return user;
   }
 
-  static Future<User> register(String username, String password, String nickname) async {
-    final data = await ApiClient().post('/auth/register', body: {'username': username, 'password': password, 'nickname': nickname});
-    await TokenStorage.saveTokens(data['accessToken'], data['refreshToken']);
-    return User.fromJson(data['user']);
+  static Future<User> register(String username, String password, String nickname, {bool rememberMe = true}) async {
+    final data = await ApiClient().post('/auth/register', body: {'username': username, 'password': password, 'nickname': nickname}) as Map;
+    final user = User.fromJson(data['user']);
+    await TokenStorage.saveSession(
+      access: data['accessToken'] as String,
+      refresh: data['refreshToken'] as String,
+      userId: user.id,
+      username: user.username,
+      rememberMe: rememberMe,
+    );
+    return user;
   }
 
   static Future<void> logout() async {
     try {
       final refresh = await TokenStorage.refreshToken;
       if (refresh != null) await ApiClient().post('/auth/logout', body: {'refreshToken': refresh});
+    } catch (_) {
+      // 断网时服务器端吊销会失败——忽略，本地一定清除
     } finally {
-      await TokenStorage.clear();
+      await TokenStorage.clearAll();
     }
   }
 
-  /// 401 时刷新。成功返回 true（拦截器会重试原请求）。
+  /// 401 时刷新 token（服务端轮换：旧 refresh 吊销、发新 refresh）。
+  /// 成功返回 true（拦截器重试原请求）。
   static Future<bool> tryRefresh() async {
     final refresh = await TokenStorage.refreshToken;
     if (refresh == null) return false;
     try {
-      final dio = ApiClient().dio;
-      // 刷新接口不带 Authorization
-      dio.options.headers.remove('Authorization');
-      final r = await dio.post('/auth/refresh', data: {'refreshToken': refresh});
-      final data = r.data['data'];
-      await TokenStorage.saveTokens(data['accessToken'], data['refreshToken']);
+      final api = ApiClient();
+      api.ensureConfigured();
+      final r = await api.dio.post('/auth/refresh', data: {'refreshToken': refresh});
+      final data = r.data['data'] as Map;
+      await TokenStorage.saveSession(
+        access: data['accessToken'] as String,
+        refresh: data['refreshToken'] as String,
+      );
       return true;
     } catch (_) {
       return false;
+    }
+  }
+
+  /// 启动自动登录：
+  /// - 无本地 token → null
+  /// - 登录时未勾选「记住我」→ 清除并返回 null（需手动登录）
+  /// - access token 本地已过期（JWT exp）→ 清除并返回 null
+  /// - 网络可用：/auth/me 校验（401 时拦截器已尝试刷新并重试）
+  /// - 网络不可用且 token 本地未过期 → 返回离线 User（可进 App，页面顶部显示离线提示条）
+  static Future<User?> autoLogin() async {
+    if (!await TokenStorage.hasTokens()) return null;
+    if (!TokenStorage.rememberSync) {
+      await TokenStorage.clearAll();
+      return null;
+    }
+    final access = TokenStorage.accessTokenSync ?? '';
+    final exp = TokenStorage.parseAccessExp(access);
+    final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    if (exp > 0 && exp < now) {
+      await TokenStorage.clearAll();
+      return null;
+    }
+    try {
+      return await me();
+    } catch (_) {
+      // 拦截器已处理 token 过期（过期会清除凭据）；
+      // 走到这里还持有 token → 只可能是网络问题 → 允许离线进入
+      if (!await TokenStorage.hasTokens()) return null;
+      return User(
+        id: TokenStorage.userIdSync ?? 0,
+        username: TokenStorage.usernameSync ?? 'offline',
+        nickname: TokenStorage.usernameSync,
+        status: 'active',
+      );
     }
   }
 

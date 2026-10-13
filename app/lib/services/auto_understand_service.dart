@@ -7,7 +7,7 @@ import '../core/api_client.dart';
 import '../models/auto_understand_result.dart';
 
 class AutoUnderstandService {
-  /// ocrText：App 端 ML Kit OCR 得到的文本
+  /// ocrText：OCR 得到的文本（当前来自服务端 /api/ocr/recognize）
   Future<AutoUnderstandResult> understand(String ocrText) async {
     final data = await ApiClient().post('/ai/understand-image', body: {'ocrText': ocrText});
     return AutoUnderstandResult.fromJson(data);

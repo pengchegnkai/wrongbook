@@ -82,7 +82,62 @@ bash ~/cuoti/termux/start-tui.sh    # 交互式控制终端（推荐日常使用
 
 当前方案：手动 `start-all.sh`，PM2 守护 Node.js，llama-server 用 nohup。
 
-## 九、常见问题
+## 九、服务端 OCR（Tesseract，实测记录）
+
+App 拍照录入的 OCR 在服务端执行（Termux Tesseract），客户端零原生 OCR 插件。
+
+### 安装
+
+```bash
+pkg install -y tesseract          # 实测装得（当前版本 5.5.3）
+```
+
+**注意：Termux 仓库没有 `tesseract-lang-zh` 包**（实测 `Unable to locate package`），
+中文语言包需手动下载 traineddata：
+
+```bash
+# GitHub 直连（手机网络经常连不上时改用下面 jsDelivr 镜像）
+curl -L -o "$PREFIX/share/tessdata/chi_sim.traineddata" \
+  "https://github.com/tesseract-ocr/tessdata_fast/raw/main/chi_sim.traineddata"
+# jsDelivr 镜像（实测可用，文件约 2.4MB）
+curl -L -o "$PREFIX/share/tessdata/chi_sim.traineddata" \
+  "https://cdn.jsdelivr.net/gh/tesseract-ocr/tessdata_fast@main/chi_sim.traineddata"
+```
+
+验证：`tesseract --list-langs` 应列出 `chi_sim` 和 `eng`。
+
+### 已知坑（已内置处理）
+
+| 坑 | 现象 | 处理 |
+|---|---|---|
+| OpenMP 亲和性崩溃 | 直接跑 `tesseract` 报 `OMP: Error #13 (kmp_affinity)` 并 abort | `server/routes/ocr.js` 调用时已固定传 `KMP_AFFINITY=disabled OMP_NUM_THREADS=1`，无需手动处理 |
+| 中英混识干扰符号 | `chi_sim+eng` 模式下英文图 `+` 被识别成 `2 二` | ocr.js 启发式：识别结果 CJK 占比 <5% 时自动用纯 `eng` 重识一次（实测有效） |
+| 中文语言包缺失 | chi_sim+eng 执行失败 | 自动降级纯 `eng` 并重试；仍失败返回 `OCR 服务不可用`，App 提示安装方法 |
+
+### 接口测试
+
+```bash
+# 1) 登录取 token（换成你的账号密码）
+TOKEN=$(curl -s -X POST http://127.0.0.1:3000/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"username":"你的用户名","password":"你的密码"}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin)['data']['accessToken'])")
+
+# 2) 上传图片识别（jpg/png，≤10MB）
+curl -s -X POST http://127.0.0.1:3000/api/ocr/recognize \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "image=@/path/to/image.jpg" | python3 -m json.tool
+```
+
+返回结构：`{ code: 0, data: { rawText, lang, questions: [{question, myAnswer}] } }`。
+切题规则：行首题号（`1.` `2、` `（3）`）开始新题；`解：/答：/答案：` 行起为作答段。
+
+### 识别质量说明
+
+Tesseract 识别不保证全对（实测英文图偶发粘连/符号误识），App 内 OCR 校对页
+**必须人工校对后再保存**；中文试卷实拍图的质量请你自己拍一张测一下。
+
+## 十、常见问题
 
 | 问题 | 处理 |
 |---|---|
@@ -91,8 +146,9 @@ bash ~/cuoti/termux/start-tui.sh    # 交互式控制终端（推荐日常使用
 | 手机锁屏后服务失联 | 检查电池优化是否已关；`termux-wake-lock` |
 | 内网其他设备访问不了 | 确认同一局域网；TUI「网络与内网」里检查 HOST 是否 0.0.0.0 |
 | llama-server 无响应 | `bash termux/llama-server.sh status`；模型加载约需数秒到数十秒 |
+| App 提示「OCR 服务不可用」 | 按上面第九节安装 tesseract 与中文语言包，重跑 `tesseract --list-langs` 验证 |
 
-## 十、安全提示
+## 十一、安全提示
 
 - 内网业务 API 全部需要 JWT 登录，无匿名访问。
 - `server/.env` 中的 `JWT_SECRET` 请修改。

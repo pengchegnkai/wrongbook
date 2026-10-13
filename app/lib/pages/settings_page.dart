@@ -1,66 +1,220 @@
-/// pages/settings_page.dart —— 设置：账号/安全/AI 模式/思考强度默认/自进化/隐私
+/// pages/settings_page.dart —— 设置页
+/// 账号 / 服务器配置 / 登录设备管理 / 主题 / 导入导出 / AI 记忆 / 本地模型 / 退出登录（二次确认）
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/config.dart';
 import '../core/router.dart';
+import '../core/ui_states.dart';
 import '../providers/auth_provider.dart';
-import '../providers/ai_memory_provider.dart';
 
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
+  Future<void> _confirmLogout(BuildContext context, WidgetRef ref) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('退出登录？'),
+        content: const Text('退出后本机登录状态将被清除，\n下次启动需要重新登录。'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('退出登录'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    await ref.read(currentUserProvider.notifier).logout();
+    if (context.mounted) context.go('/login');
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(currentUserProvider).value;
+    final user = ref.watch(currentUserProvider).valueOrNull;
+    final themeMode = ref.watch(themeModeProvider);
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(title: const Text('设置')),
-      body: ListView(
+      body: Column(
         children: [
-          const _Header('账号'),
-          ListTile(leading: const Icon(Icons.person), title: Text(user?.nickname ?? user?.username ?? '未登录'), onTap: () => context.push('/profile')),
-          ListTile(leading: const Icon(Icons.devices), title: const Text('登录设备管理'), onTap: () => context.push('/devices')),
-          ListTile(leading: const Icon(Icons.logout), title: const Text('退出登录'), onTap: () async {
-            await ref.read(currentUserProvider.notifier).logout();
-            if (context.mounted) context.go('/login');
-          }),
-          const _Header('服务器'),
-          ListTile(leading: const Icon(Icons.dns), title: const Text('服务器配置'), onTap: () => context.push('/server-config')),
-          const _Header('AI 与自进化'),
-          ListTile(leading: const Icon(Icons.tune), title: const Text('思考强度设置'), onTap: () => context.push('/strength-selector')),
-          ListTile(leading: const Icon(Icons.memory), title: const Text('AI 记忆管理'), onTap: () => context.push('/ai-memory')),
-          ListTile(leading: const Icon(Icons.face), title: const Text('AI 学习画像'), onTap: () => context.push('/ai-profile')),
-          ListTile(leading: const Icon(Icons.dns), title: const Text('本地模型管理'), onTap: () => context.push('/model-manage')),
-          const _Header('外观'),
-          ListTile(
-            leading: const Icon(Icons.dark_mode),
-            title: const Text('深色模式'),
-            trailing: DropdownButton<ThemeMode>(
-              value: ref.watch(themeModeProvider),
-              items: const [
-                DropdownMenuItem(value: ThemeMode.system, child: Text('跟随系统')),
-                DropdownMenuItem(value: ThemeMode.light, child: Text('浅色')),
-                DropdownMenuItem(value: ThemeMode.dark, child: Text('深色')),
+          const OfflineBanner(),
+          Expanded(
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                // 账号卡片
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerLow,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      CircleAvatar(radius: 24, child: Text((user?.nickname?.isNotEmpty ?? false) ? user!.nickname![0].toUpperCase() : '?')),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(user?.nickname ?? user?.username ?? '-', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            Text('@${user?.username ?? ''}', style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
+                          ],
+                        ),
+                      ),
+                      TextButton(onPressed: () => context.push('/profile'), child: const Text('编辑')),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _SectionTitle('服务器'),
+                _Tile(
+                  icon: Icons.dns_outlined,
+                  title: '服务器地址',
+                  subtitle: AppConfig.baseUrl,
+                  onTap: () => context.push('/server-config'),
+                ),
+                _Tile(
+                  icon: Icons.qr_code,
+                  title: '扫码配置',
+                  subtitle: '扫描内网地址二维码',
+                  onTap: () => context.push('/qr-scan'),
+                ),
+                const SizedBox(height: 16),
+                _SectionTitle('账号与安全'),
+                _Tile(
+                  icon: Icons.devices,
+                  title: '登录设备管理',
+                  subtitle: '查看登录设备并远程下线',
+                  onTap: () => context.push('/devices'),
+                ),
+                _Tile(
+                  icon: Icons.lock_reset,
+                  title: '修改密码 / 昵称',
+                  subtitle: '修改后其他设备需重新登录',
+                  onTap: () => context.push('/profile'),
+                ),
+                const SizedBox(height: 16),
+                _SectionTitle('个性化'),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.dark_mode_outlined),
+                      const SizedBox(width: 12),
+                      const Text('主题模式'),
+                      const Spacer(),
+                      DropdownButtonHideUnderline(
+                        child: DropdownButton<ThemeMode>(
+                          value: themeMode,
+                          items: const [
+                            DropdownMenuItem(value: ThemeMode.system, child: Text('跟随系统')),
+                            DropdownMenuItem(value: ThemeMode.light, child: Text('浅色')),
+                            DropdownMenuItem(value: ThemeMode.dark, child: Text('深色')),
+                          ],
+                          onChanged: (v) => ref.read(themeModeProvider.notifier).state = v ?? ThemeMode.system,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _SectionTitle('数据'),
+                _Tile(
+                  icon: Icons.input,
+                  title: '导入 / 导出',
+                  subtitle: 'JSON / CSV 备份与恢复',
+                  onTap: () => context.push('/import-export'),
+                ),
+                _Tile(
+                  icon: Icons.memory,
+                  title: 'AI 记忆',
+                  subtitle: '查看 / 编辑 / 删除 AI 对你的了解',
+                  onTap: () => context.push('/ai-memory'),
+                ),
+                const SizedBox(height: 16),
+                _SectionTitle('本地模型'),
+                _Tile(
+                  icon: Icons.memory,
+                  title: '模型管理',
+                  subtitle: '查看 / 切换 / 下载本地模型',
+                  onTap: () => context.push('/model-manage'),
+                ),
+                const SizedBox(height: 24),
+                FilledButton.tonal(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: scheme.errorContainer,
+                    foregroundColor: scheme.onErrorContainer,
+                    minimumSize: const Size.fromHeight(48),
+                  ),
+                  onPressed: () => _confirmLogout(context, ref),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.logout, size: 18),
+                      SizedBox(width: 8),
+                      Text('退出登录'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Center(
+                  child: Text('错题本 v1.0.0 · 本地私有部署',
+                      style: TextStyle(fontSize: 11, color: scheme.outline)),
+                ),
+                const SizedBox(height: 24),
               ],
-              onChanged: (m) { if (m != null) ref.read(themeModeProvider.notifier).state = m; },
             ),
           ),
-          const _Header('数据'),
-          ListTile(leading: const Icon(Icons.import_export), title: const Text('导入导出'), onTap: () => context.push('/import-export')),
-          const _Header('隐私'),
-          const ListTile(leading: Icon(Icons.lock), title: Text('数据隔离说明'),
-            subtitle: Text('所有数据按账号隔离：错题、AI 记忆、检索与导出均只含当前账号数据', style: TextStyle(fontSize: 12))),
         ],
       ),
     );
   }
 }
 
-class _Header extends StatelessWidget {
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
   final String text;
-  const _Header(this.text);
+
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-    child: Text(text, style: TextStyle(color: Theme.of(context).colorScheme.primary, fontWeight: FontWeight.bold, fontSize: 13)),
-  );
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      child: Text(
+        text,
+        style: TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w600,
+          color: Theme.of(context).colorScheme.primary,
+        ),
+      ),
+    );
+  }
+}
+
+class _Tile extends StatelessWidget {
+  const _Tile({required this.icon, required this.title, this.subtitle, required this.onTap});
+  final IconData icon;
+  final String title;
+  final String? subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ListTile(
+      leading: Icon(icon, color: scheme.primary),
+      title: Text(title, style: const TextStyle(fontSize: 14)),
+      subtitle: subtitle != null ? Text(subtitle!, style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)) : null,
+      trailing: const Icon(Icons.chevron_right),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      onTap: onTap,
+    );
+  }
 }

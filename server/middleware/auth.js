@@ -1,6 +1,5 @@
 // middleware/auth.js —— JWT 鉴权，注入 req.userId
-const jwt = require('jsonwebtoken');
-const { query } = require('../db');
+const { verifyAccess } = require('../services/tokenService');
 
 module.exports = async function authMiddleware(req, res, next) {
   try {
@@ -8,8 +7,8 @@ module.exports = async function authMiddleware(req, res, next) {
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) return res.status(401).json({ code: 401, data: null, message: '未登录' });
 
-    const payload = jwt.verify(token, process.env.JWT_SECRET || 'CHANGE_ME');
-    // 检查 token 是否被吊销（简单版：查 refresh_tokens 无关联，access token 短期有效即可）
+    const payload = verifyAccess(token);
+    // access token 30 分钟短期有效，不做逐请求吊销检查
     req.userId = payload.uid;
     req.username = payload.username;
 
