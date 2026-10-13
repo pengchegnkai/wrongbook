@@ -145,30 +145,26 @@ jobs:
         if: failure()
         run: |
           {
-            echo "## Build 失败摘要（build.log 末尾 60 行）"
+            echo "## Build 失败摘要（build.log 末尾 80 行）"
             echo '```'
-            tail -n 60 build.log 2>/dev/null || echo '（build.log 不存在）'
+            tail -n 80 build.log 2>/dev/null || echo '（build.log 不存在）'
             echo '```'
-            echo "## analyze.log 末尾 40 行"
+            echo "## analyze.log error 行（前 40 条）"
             echo '```'
-            tail -n 40 analyze.log 2>/dev/null || echo '（analyze.log 不存在）'
+            grep -E '^\s*error' analyze.log 2>/dev/null | head -40 || echo '（无 error 行或 analyze.log 不存在）'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
-          # 文件自检：确认日志存在与大小（匿名 API 可读）
-          echo "::error::LS $(ls -la build.log analyze.log 2>/dev/null | awk '{print $5, $9}' | tr '\n' ' ')"
-          # gradle 失败原因在 "What went wrong" 段落（日志中部）
-          awk '/What went wrong/{f=1} f{print; n++} n>14{exit}' build.log 2>/dev/null | while IFS= read -r line; do
-            echo "::error::W ${line:0:180}"
-          done
-          # 宽网提取：大小写不敏感的全部错误相关行（去重，限 50 条）
-          grep -inE 'error|exception|failed|cannot|unable|missing|undefined|bad state|segfault|abort' build.log 2>/dev/null \
-            | sort -u -t: -k2 | head -50 | while IFS= read -r line; do
-              echo "::error::D ${line:0:200}"
-            done
-          # analyze.log 尾部全量（Dart 静态错误清单）
-          tail -n 60 analyze.log 2>/dev/null | while IFS= read -r line; do
+          # 注解总量必须 <50（API 端点有上限，超出被截断）：
+          # 1) Dart 静态错误（analyze.log error 行，前 15 条）
+          grep -m 15 -E '^\s*error' analyze.log 2>/dev/null | while IFS= read -r line; do
             echo "::error::A ${line:0:200}"
           done
+          # 2) build.log 错误相关行（前 12 条，大小写不敏感）
+          grep -im 12 -E 'error|exception|failed|cannot|unable|missing|undefined' build.log 2>/dev/null | while IFS= read -r line; do
+            echo "::error::D ${line:0:200}"
+          done
+          # 3) 日志行数自检
+          echo "::error::LS build=$(wc -l < build.log 2>/dev/null) analyze=$(wc -l < analyze.log 2>/dev/null) lines"
           echo "done"
 
       - name: Rename APK with short commit
