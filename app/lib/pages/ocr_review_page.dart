@@ -251,7 +251,7 @@ class _OcrReviewPageState extends ConsumerState<OcrReviewPage> {
 }
 
 class _RawTextPanel extends StatelessWidget {
-  const _RawTextPanel({required this.text, required this.expanded, required this.onToggle});
+  _RawTextPanel({required this.text, required this.expanded, required this.onToggle});
   final String text;
   final bool expanded;
   final VoidCallback onToggle;
@@ -283,7 +283,7 @@ class _RawTextPanel extends StatelessWidget {
 }
 
 class _QuestionEditor extends StatelessWidget {
-  const _QuestionEditor({required this.index, required this.edit, required this.onRemove});
+  _QuestionEditor({required this.index, required this.edit, required this.onRemove});
   final int index;
   final QEdit edit;
   final VoidCallback onRemove;

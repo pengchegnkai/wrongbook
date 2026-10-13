@@ -108,7 +108,7 @@ class _SkeletonCardState extends State<_SkeletonCard> with SingleTickerProviderS
 
 /// 空数据插画 + 引导按钮
 class EmptyStateView extends StatelessWidget {
-  const EmptyStateView({
+  EmptyStateView({
     super.key,
     required this.icon,
     required this.title,
@@ -160,7 +160,7 @@ class EmptyStateView extends StatelessWidget {
 
 /// 出错重试组件
 class ErrorRetryView extends StatelessWidget {
-  const ErrorRetryView({super.key, required this.message, required this.onRetry});
+  ErrorRetryView({super.key, required this.message, required this.onRetry});
   final String message;
   final VoidCallback onRetry;
 

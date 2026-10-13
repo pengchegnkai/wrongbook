@@ -25,7 +25,7 @@ class AiAnalysisPage extends ConsumerStatefulWidget {
 
 class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
   int? _selectedQuestionId;
-  String? _selectedTemplateId;
+  int? _selectedTemplateId;
   String? _selectedStrength;
   final _extraCtrl = TextEditingController();
   Timer? _ticker;
@@ -82,7 +82,7 @@ class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
     _startTicker();
     await ref.read(analysisProvider.notifier).analyze(
           questionId: qid,
-          templateId: _selectedTemplateId == null ? null : int.tryParse(_selectedTemplateId),
+          templateId: _selectedTemplateId,
           strength: _selectedStrength,
           extra: _extraCtrl.text.trim().isEmpty ? null : _extraCtrl.text.trim(),
         );
@@ -144,7 +144,7 @@ class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
                     ],
                     onChanged: analysis.running
                         ? null
-                        : (v) => setState(() => _selectedTemplateId = v?.toString() ?? null),
+                        : (v) => setState(() => _selectedTemplateId = v),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -257,7 +257,7 @@ class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
 
 /// 错题下拉选择（最近 30 条）
 class _QuestionPicker extends ConsumerStatefulWidget {
-  const _QuestionPicker({required this.selected, required this.onSelect});
+  _QuestionPicker({required this.selected, required this.onSelect});
   final int? selected;
   final ValueChanged<int?> onSelect;
 

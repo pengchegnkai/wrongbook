@@ -61,7 +61,7 @@ class HomePage extends ConsumerWidget {
 
 /// 平板/横屏左侧导航
 class _NavPanel extends StatelessWidget {
-  const _NavPanel({required this.onTap});
+  _NavPanel({required this.onTap});
   final void Function(String path) onTap;
 
   @override
@@ -85,7 +85,7 @@ class _NavPanel extends StatelessWidget {
 
 /// 右侧/主内容区
 class _HomeContent extends ConsumerWidget {
-  const _HomeContent(this.ref);
+  _HomeContent(this.ref);
   final WidgetRef ref;
 
   @override

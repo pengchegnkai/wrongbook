@@ -92,7 +92,7 @@ class QuestionDetailPage extends ConsumerWidget {
 }
 
 class _DetailContent extends ConsumerWidget {
-  const _DetailContent({required this.q, required this.id, required this.ref});
+  _DetailContent({required this.q, required this.id, required this.ref});
   final dynamic q;
   final String id;
   final WidgetRef ref;

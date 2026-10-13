@@ -178,7 +178,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 }
 
 class _ReviewCard extends StatelessWidget {
-  const _ReviewCard({required this.question, required this.flipped, required this.onFlip});
+  _ReviewCard({required this.question, required this.flipped, required this.onFlip});
   final Question question;
   final bool flipped;
   final VoidCallback onFlip;

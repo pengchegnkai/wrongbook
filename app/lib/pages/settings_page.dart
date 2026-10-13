@@ -199,7 +199,7 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _Tile extends StatelessWidget {
-  const _Tile({required this.icon, required this.title, this.subtitle, required this.onTap});
+  _Tile({required this.icon, required this.title, this.subtitle, required this.onTap});
   final IconData icon;
   final String title;
   final String? subtitle;

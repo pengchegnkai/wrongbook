@@ -42,7 +42,9 @@ class _QuestionListPageState extends ConsumerState<QuestionListPage> {
   }
 
   void _onSearchChanged(String v) {
-    ref.read(questionFilterProvider.notifier).update((f) => f.copyWith(search: v.isEmpty ? null : v, clearSearch: v.isEmpty));
+    final f = ref.read(questionFilterProvider);
+    ref.read(questionFilterProvider.notifier).state =
+        f.copyWith(search: v.isEmpty ? null : v, clearSearch: v.isEmpty);
     ref.read(questionListProvider.notifier).refresh();
   }
 
@@ -68,7 +70,8 @@ class _QuestionListPageState extends ConsumerState<QuestionListPage> {
         onAction: () {
           if (filter.search != null) {
             _searchCtrl.clear();
-            ref.read(questionFilterProvider.notifier).update((f) => f.copyWith(clearSearch: true));
+            final f = ref.read(questionFilterProvider);
+            ref.read(questionFilterProvider.notifier).state = f.copyWith(clearSearch: true);
           }
           ref.read(questionListProvider.notifier).refresh();
           if (filter.search == null) context.push('/scan');
@@ -138,8 +141,9 @@ class _QuestionListPageState extends ConsumerState<QuestionListPage> {
                             ),
                         ],
                         onChanged: (v) {
-                          ref.read(questionFilterProvider.notifier).update(
-                              (f) => f.copyWith(subjectId: v, clearSubject: v == null));
+                          final f = ref.read(questionFilterProvider);
+                          ref.read(questionFilterProvider.notifier).state =
+                              f.copyWith(subjectId: v, clearSubject: v == null);
                           ref.read(questionListProvider.notifier).refresh();
                         },
                       ),
@@ -184,13 +188,15 @@ class _QuestionListPageState extends ConsumerState<QuestionListPage> {
   }
 
   void _setMastery(String? m) {
-    ref.read(questionFilterProvider.notifier).update((f) => f.copyWith(mastery: m, clearMastery: m == null));
+    final f = ref.read(questionFilterProvider);
+    ref.read(questionFilterProvider.notifier).state =
+        f.copyWith(mastery: m, clearMastery: m == null);
     ref.read(questionListProvider.notifier).refresh();
   }
 }
 
 class _FilterChip extends StatelessWidget {
-  const _FilterChip({required this.label, required this.selected, required this.onTap});
+  _FilterChip({required this.label, required this.selected, required this.onTap});
   final String label;
   final bool selected;
   final VoidCallback onTap;
@@ -212,7 +218,7 @@ class _FilterChip extends StatelessWidget {
 }
 
 class _QuestionCard extends StatelessWidget {
-  const _QuestionCard({required this.q, required this.onTap});
+  _QuestionCard({required this.q, required this.onTap});
   final dynamic q;
   final VoidCallback onTap;
 
