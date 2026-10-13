@@ -162,6 +162,15 @@ jobs:
           grep -n -E 'FAILURE:|Task .*(failed|not found)|Caused by|Missing class|R8:' build.log 2>/dev/null | head -12 | while IFS= read -r line; do
             echo "::error::E ${line:0:180}"
           done
+          # Dart 编译错误行（compileFlutterBuildRelease 阶段，错误在日志中部）
+          grep -E '\[Error\]|^Error:|Error: |Error \(|Target of URI|doesn.t exist|isn.t defined|undefined (class|method|get|identifier)|The named (parameter|argument)|Required.*missing|extends (a non|an invalid)|isn.t a (valid|subtype|const)|Const.*variable|Local variable|A value of type' build.log 2>/dev/null \
+            | sort -u | head -40 | while IFS= read -r line; do
+              echo "::error::D ${line:0:200}"
+            done
+          # analyze.log 里的错误行（flutter analyze 单独运行过）
+          grep -E '^\s*error ' analyze.log 2>/dev/null | head -40 | while IFS= read -r line; do
+            echo "::error::A ${line:0:200}"
+          done
           echo "done"
 
       - name: Rename APK with short commit
