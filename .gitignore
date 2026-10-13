@@ -33,3 +33,7 @@ app/.flutter-plugins-dependencies
 # ===== 系统文件 =====
 .DS_Store
 Thumbs.db
+
+# 服务端 OCR 临时上传目录
+test_ocr_eng.png
+server/tmp/
