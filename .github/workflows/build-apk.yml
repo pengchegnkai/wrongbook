@@ -10,6 +10,8 @@ on:
 jobs:
   build-apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 允许 GITHUB_TOKEN 创建 latest 标签与 Release
     steps:
       - name: Checkout
         uses: actions/checkout@v4
