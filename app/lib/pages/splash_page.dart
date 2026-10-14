@@ -24,7 +24,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(currentUserProvider);
-    if (auth.isCompleted && !_navigated) {
+    if (!auth.isLoading && !_navigated) {
       _navigated = true;
       Future.microtask(() {
         if (!mounted) return;

@@ -28,7 +28,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     super.dispose();
   }
 
-  String? _extractErrorMessage(Object error) {
+  String? _extractErrorMessage(Object? error) {
     if (error is DioException) {
       final d = error.response?.data;
       if (d is Map && d['message'] is String && (d['message'] as String).isNotEmpty) {

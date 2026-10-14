@@ -320,7 +320,7 @@ class _QuestionPickerState extends ConsumerState<_QuestionPicker> {
       );
     }
     return DropdownButtonFormField<int?>(
-      value: _widget.selected,
+      value: widget.selected,
       decoration: const InputDecoration(
         border: OutlineInputBorder(),
         isDense: true,

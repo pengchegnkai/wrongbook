@@ -11,21 +11,6 @@ class QuestionDetailPage extends ConsumerWidget {
   const QuestionDetailPage({super.key, required this.id});
   final String id;
 
-  Future<void> _updateMastery(WidgetRef ref, String mastery) async {
-    try {
-      await ApiClient().put('/questions/$id', body: {'mastery': mastery});
-      ref.invalidate(questionDetailProvider(id));
-      if (ref.context.mounted) {
-        ScaffoldMessenger.of(ref.context).showSnackBar(const SnackBar(content: Text('掌握度已更新')));
-      }
-    } catch (e) {
-      if (ref.context.mounted) {
-        ScaffoldMessenger.of(ref.context)
-            .showSnackBar(SnackBar(content: Text('更新失败：${_msg(e)}')));
-      }
-    }
-  }
-
   Future<void> _delete(BuildContext context, WidgetRef ref) async {
     final ok = await showDialog<bool>(
       context: context,
@@ -97,6 +82,26 @@ class _DetailContent extends ConsumerWidget {
   final String id;
   final WidgetRef ref;
 
+  Future<void> _updateMastery(String mastery) async {
+    try {
+      await ApiClient().put('/questions/$id', body: {'mastery': mastery});
+      ref.invalidate(questionDetailProvider(id));
+      if (ref.context.mounted) {
+        ScaffoldMessenger.of(ref.context).showSnackBar(const SnackBar(content: Text('掌握度已更新')));
+      }
+    } catch (e) {
+      if (ref.context.mounted) {
+        ScaffoldMessenger.of(ref.context)
+            .showSnackBar(SnackBar(content: Text('更新失败：${_msg(e)}')));
+      }
+    }
+  }
+
+  String _msg(Object? e) {
+    final s = e.toString();
+    return s.startsWith('Exception:') ? s.substring(10) : s;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef _) {
     final scheme = Theme.of(context).colorScheme;
@@ -126,7 +131,7 @@ class _DetailContent extends ConsumerWidget {
           _Section(title: '正确答案', child: Text('${q.correctAnswer}', style: const TextStyle(fontSize: 14, height: 1.5, color: Colors.greenAccent))),
         if (q.analysis != null && '${q.analysis}'.isNotEmpty)
           _Section(title: '解析', child: Text('${q.analysis}', style: const TextStyle(fontSize: 14, height: 1.5))),
-        if ((q.knowledgePoints as List?).isNotEmpty) ...[
+        if ((q.knowledgePoints as List?)?.isNotEmpty ?? false) ...[
           const SizedBox(height: 12),
           Text('知识点', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 6),
@@ -153,7 +158,7 @@ class _DetailContent extends ConsumerWidget {
                   child: ChoiceChip(
                     label: Text(e.value, style: const TextStyle(fontSize: 12)),
                     selected: q.mastery == e.key,
-                    onSelected: (_) => _updateMastery(ref, e.key),
+                    onSelected: (_) => _updateMastery(e.key),
                   ),
                 ),
               ),

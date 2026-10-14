@@ -102,7 +102,7 @@ class AuthInterceptor extends Interceptor {
         await TokenStorage.clearAll();
         return handler.next(err);
       }
-      final bool refreshed;
+      var refreshed = false;
       if (_refreshing != null) {
         // 并发 401：等待第一次刷新完成，共用其结果
         refreshed = await _refreshing!.future;

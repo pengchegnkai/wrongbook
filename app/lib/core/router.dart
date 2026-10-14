@@ -49,7 +49,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       final auth = ref.read(currentUserProvider);
       final loc = state.matchedLocation;
-      if (!auth.isCompleted) {
+      if (auth.isLoading) {
         // 启动引导未完成：锁在 splash
         return publicPaths.contains(loc) ? null : '/splash';
       }
@@ -117,8 +117,8 @@ final routerProvider = Provider<GoRouter>((ref) {
     ),
   );
 
-  // 登录态变化 → 重新评估守卫
-  ref.listenManual(currentUserProvider, (_, __) => router.refresh());
+  // 登录态变化 → 重新评估守卫：redirect 在每次导航时 ref.read 当前状态，
+  // 配合登录/登出后显式 context.go 即可完成重定向（无需 listenManual）。
   return router;
 });
 
