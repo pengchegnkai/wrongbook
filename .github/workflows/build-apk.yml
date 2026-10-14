@@ -179,3 +179,18 @@ jobs:
           name: cuoti-app-release-apk
           path: cuoti-app-*.apk
           if-no-files-found: error
+
+      # 发 Release：每次成功构建替换 latest 标签下的 APK，
+      # 固定下载 URL（免登录）：
+      # https://github.com/pengchegnkai/wrongbook/releases/latest/download/cuoti-app-latest.apk
+      - name: Publish to GitHub Release (latest)
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp cuoti-app-${GITHUB_SHA::7}.apk cuoti-app-latest.apk
+          gh release delete latest --yes 2>/dev/null || true
+          gh release create latest \
+            cuoti-app-latest.apk \
+            --title "错题本 APK（自动构建）" \
+            --notes "commit ${GITHUB_SHA::7} · 构建 ${GITHUB_RUN_AT}"
