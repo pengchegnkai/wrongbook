@@ -53,7 +53,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
             const SizedBox(height: 8),
             Text(
               '本地私有错题管理 · AI 分析',
-              style: TextStyle(color: scheme.onPrimary, opacity: 0.85),
+              style: TextStyle(color: scheme.onPrimary.withValues(alpha: 0.85)),
             ),
             const SizedBox(height: 48),
             SizedBox(
@@ -62,7 +62,7 @@ class _SplashPageState extends ConsumerState<SplashPage> {
               child: CircularProgressIndicator(strokeWidth: 3, color: scheme.onPrimary),
             ),
             const SizedBox(height: 12),
-            Text('正在启动…', style: TextStyle(color: scheme.onPrimary, opacity: 0.8)),
+            Text('正在启动…', style: TextStyle(color: scheme.onPrimary.withValues(alpha: 0.8))),
           ],
         ),
       ),

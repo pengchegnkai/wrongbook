@@ -33,6 +33,7 @@ jobs:
           flutter create --org com.cuoti --project-name cuoti_app build_tmp
           # 2) 合入 Dart 源码与依赖清单
           rm -rf build_tmp/lib
+          rm -rf build_tmp/test   # 模板测试引用 MyApp（本工程无此类），删除
           cp -r app/lib build_tmp/lib
           cp app/pubspec.yaml build_tmp/pubspec.yaml
           # 3) 覆盖 AndroidManifest（权限 + cleartext + 中文应用名）
@@ -64,7 +65,7 @@ jobs:
               '        val androidExt = extensions.findByName("android") ?: return@allprojects' \
               '        val setter = androidExt.javaClass.methods.firstOrNull { it.name == "setCompileSdk" }' \
               '        if (setter != null) {' \
-              '            try { setter.invoke(androidExt, "36") } catch (e: Exception) { println("compileSdk bump failed: $e") }' \
+              '            try { setter.invoke(androidExt, 36) } catch (e: Exception) { println("compileSdk bump failed: $e") }' \
               '        }' \
               '    }' \
               '}' \
@@ -78,7 +79,7 @@ jobs:
               '        if (project.extensions.findByName("android") != null) {' \
               '            def androidExt = project.extensions.getByName("android")' \
               '            def setter = androidExt.class.methods.find { it.name == "setCompileSdk" }' \
-              '            if (setter != null) { try { setter.invoke(androidExt, "36") } catch (Exception e) { println("compileSdk bump failed: $e") } }' \
+              '        if (setter != null) { try { setter.invoke(androidExt, 36) } catch (Exception e) { println("compileSdk bump failed: $e") } }' \
               '        }' \
               '    }' \
               '}' \

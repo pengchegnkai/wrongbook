@@ -2,6 +2,7 @@
 /// 图片上传到 POST /api/ocr/recognize，服务端识别并按题号切分。
 /// 客户端不再做任何本地 OCR（彻底移除 ML Kit，规避原生插件生命周期崩溃）。
 import 'dart:io';
+import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 
 /// OCR 切出的一道题

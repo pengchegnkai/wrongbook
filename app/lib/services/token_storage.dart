@@ -53,7 +53,9 @@ class TokenStorage {
     _userIdCache = null;
     _usernameCache = null;
     _rememberCache = true;
-    await _storage.deleteAll(keys: const [_kAccess, _kRefresh, _kUserId, _kUsername, _kRemember]);
+    for (final k in [_kAccess, _kRefresh, _kUserId, _kUsername, _kRemember]) {
+      await _storage.delete(key: k);
+    }
   }
 
   /// 是否有本地 token；同时把磁盘数据灌入同步缓存（App 重启后调用一次）
