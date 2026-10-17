@@ -43,8 +43,16 @@ class AuthService {
     }
   }
 
+  /// 连接类错误判定（区分"断网"与"凭据失效"用）
+  static bool isNetworkError(DioException e) =>
+      e.type == DioExceptionType.connectionError ||
+      e.type == DioExceptionType.connectionTimeout ||
+      e.type == DioExceptionType.sendTimeout;
+
   /// 401 时刷新 token（服务端轮换：旧 refresh 吊销、发新 refresh）。
-  /// 成功返回 true（拦截器重试原请求）。
+  /// 成功返回 true（拦截器重试原请求）；
+  /// 刷新请求自身断网/服务器 5xx 时抛出 DioException（凭据未必失效，
+  /// 调用方不得据此清除本地登录态）。
   static Future<bool> tryRefresh() async {
     final refresh = await TokenStorage.refreshToken;
     if (refresh == null) return false;
@@ -58,6 +66,10 @@ class AuthService {
         refresh: data['refreshToken'] as String,
       );
       return true;
+    } on DioException catch (e) {
+      final status = e.response?.statusCode ?? 0;
+      if (isNetworkError(e) || status >= 500) rethrow;
+      return false;
     } catch (_) {
       return false;
     }
@@ -90,9 +102,13 @@ class AuthService {
     try {
       return await me();
     } on DioException catch (e) {
-      final networkDown = e.type == DioExceptionType.connectionError ||
-          e.type == DioExceptionType.connectionTimeout;
-      if (networkDown && await TokenStorage.hasTokens()) {
+      final status = e.response?.statusCode ?? 0;
+      // 连接错误 / 超时 / 5xx 都可能是瞬时问题；本地 token 未被否定时
+      // 一律降级为离线模式（断网 ≠ 未登录）。401 时拦截器已清凭据并重抛。
+      final transient = isNetworkError(e) ||
+          e.type == DioExceptionType.receiveTimeout ||
+          status >= 500;
+      if (transient && await TokenStorage.hasTokens()) {
         return User(
           id: TokenStorage.userIdSync ?? 0,
           username: TokenStorage.usernameSync ?? 'offline',
@@ -100,7 +116,7 @@ class AuthService {
           status: 'active',
         );
       }
-      rethrow; // 5xx/响应异常/401 已清凭据等 → bootstrap 置为未登录
+      rethrow; // 其他错误（401 已清凭据等）→ bootstrap 置为未登录
     }
   }
 

@@ -20,18 +20,19 @@ class _KnowledgeGraphPageState extends ConsumerState<KnowledgeGraphPage> {
     try {
       final kps = await ApiClient().get('/subjects/kps/all') as List;
       final buf = StringBuffer('graph TD\n');
-      for (final kp in kps) {
+      for (var i = 0; i < kps.length; i++) {
+        final kp = kps[i];
         final chapter = kp['chapter_name'] ?? '未分类';
         final name = (kp['name'] ?? '').toString().replaceAll(RegExp(r'["()]'), '');
-        buf.writeln('  ${_safeId(chapter)}["$chapter"] --> ${_safeId(name)}["$name"]');
+        // 节点 id 用索引前缀，避免 hashCode 碰撞导致 Mermaid 节点错连
+        buf.writeln('  n${i}c["$chapter"] --> n${i}k["$name"]');
       }
+      if (!mounted) return;
       setState(() => _mermaid = buf.toString());
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('生成失败：$e')));
     }
   }
-
-  String _safeId(String s) => 'n${s.hashCode.abs()}';
 
   @override
   Widget build(BuildContext context) {

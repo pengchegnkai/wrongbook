@@ -83,12 +83,7 @@ class _QuestionListPageState extends ConsumerState<QuestionListPage> {
         onRefresh: () => ref.read(questionListProvider.notifier).refresh(),
         child: showTopSkeleton
             ? const PageSkeleton(itemCount: 6)
-            : NotificationListener<ScrollEndNotification>(
-                onNotification: (_) {
-                  _onScroll();
-                  return false;
-                },
-                child: ListView.separated(
+            : ListView.separated(
                   controller: _scrollCtrl,
                   padding: const EdgeInsets.all(16),
                   itemCount: list.items.length + (list.loading ? 1 : 0),
@@ -104,7 +99,6 @@ class _QuestionListPageState extends ConsumerState<QuestionListPage> {
                     return _QuestionCard(q: q, onTap: () => context.push('/questions/detail/${q.id}'));
                   },
                 ),
-              ),
       );
     }
 

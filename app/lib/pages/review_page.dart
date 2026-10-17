@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../core/ui_states.dart';
 import '../models/question.dart';
 import '../providers/review_provider.dart';
+import '../providers/stats_provider.dart';
 
 class ReviewPage extends ConsumerStatefulWidget {
   const ReviewPage({super.key});
@@ -20,6 +21,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   bool _flipped = false;
   bool _submitting = false;
   List<Question>? _local; // 本地剩余卡片：提交成功即移除（来源：provider 首次数据）
+  int? _initialCount; // 首次拉到的卡片总数：区分"今天本来就没有"和"已复习完"
 
   @override
   void initState() {
@@ -36,7 +38,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 
   Future<void> _submit(int idx, String result) async {
     final cards = _local;
-    if (cards == null || _submitting || idx >= cards.length || cards[idx].id == null) return;
+    if (cards == null || _submitting || cards.isEmpty) return;
+    // 删卡后 PageView 可能尚未跳转，_pageCtrl.page 可能越界 → clamp
+    idx = idx.clamp(0, cards.length - 1);
+    if (cards[idx].id == null) return;
     final qid = cards[idx].id!;
     setState(() => _submitting = true);
     try {
@@ -46,6 +51,16 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
         cards.removeAt(idx); // 本地移除，无需整页刷新
         _flipped = false;
       });
+      // 移除的是最后一张时，PageView 的当前页会越出新的 itemCount → 跳回最后一页
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_pageCtrl.hasClients) return;
+        final page = _pageCtrl.page ?? 0;
+        if (cards.isNotEmpty && page >= cards.length) {
+          _pageCtrl.jumpTo(_pageCtrl.position.maxScrollExtent);
+        }
+      });
+      // 复习提交会影响首页概览统计 → 使其失效
+      ref.invalidate(overviewStatsProvider);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('提交失败：${_msg(e)}，请检查网络')));
@@ -91,17 +106,24 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
               ),
               error: (e, _) => ErrorRetryView(
                 message: _msg(e),
-                onRetry: () => ref.invalidate(reviewCardsProvider),
+                onRetry: () {
+                  setState(() {
+                    _local = null;
+                    _initialCount = null;
+                  });
+                  ref.invalidate(reviewCardsProvider);
+                },
               ),
               data: (cards) {
                 _local ??= List<Question>.from(cards);
+                _initialCount ??= cards.length;
                 final list = _local!;
                 if (list.isEmpty) {
                   // 复习完成（或今天本来就没有）共用完成态
                   return EmptyStateView(
                     icon: Icons.celebration,
                     title: '复习完成 🎉',
-                    message: cards.isEmpty
+                    message: (_initialCount ?? 0) == 0
                         ? '今天没有待复习的错题。录入新错题后，会按 1/3/7/15 天间隔提醒你复习'
                         : '本轮错题已全部复习完毕，明天继续加油',
                     actionLabel: '去录入错题',

@@ -13,6 +13,15 @@ class AiProfilePage extends ConsumerStatefulWidget {
 
 class _AiProfilePageState extends ConsumerState<AiProfilePage> {
   final _goal = TextEditingController();
+  bool _goalFilled = false; // 学习目标只在首次拿到 profile 时填充一次
+
+  static const _styles = ['step_by_step', 'concise', 'detailed', 'exam_oriented'];
+
+  @override
+  void dispose() {
+    _goal.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context, ) {
@@ -22,14 +31,25 @@ class _AiProfilePageState extends ConsumerState<AiProfilePage> {
     return Scaffold(
       appBar: AppBar(title: const Text('AI 学习画像'), actions: [
         IconButton(icon: const Icon(Icons.refresh), tooltip: '从错题统计刷新', onPressed: () async {
-          await ref.watch(aiMemoryServiceProvider).refreshProfile();
-          ref.invalidate(aiProfileProvider);
+          try {
+            await ref.read(aiMemoryServiceProvider).refreshProfile();
+            ref.invalidate(aiProfileProvider);
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('刷新失败：$e')));
+            }
+          }
         }),
       ]),
       body: profile.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('加载失败：$e')),
-        data: (AiProfile? p) => ListView(padding: const EdgeInsets.all(16), children: [
+        data: (AiProfile? p) {
+          if (!_goalFilled) {
+            _goalFilled = true;
+            _goal.text = p?.learningGoal ?? '';
+          }
+          return ListView(padding: const EdgeInsets.all(16), children: [
           Card(child: Padding(padding: const EdgeInsets.all(12), child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -44,12 +64,13 @@ class _AiProfilePageState extends ConsumerState<AiProfilePage> {
             ],
           ))),
           const SizedBox(height: 16),
-          TextField(controller: _goal..text = p?.learningGoal ?? '',
+          TextField(controller: _goal,
             maxLines: 3, decoration: const InputDecoration(labelText: '学习目标（会影响 AI 分析口吻）')),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             decoration: const InputDecoration(labelText: '解释风格'),
-            value: p?.preferredExplanationStyle,
+            // 服务端可能存了不在选项里的值 → 直接当 value 会触发断言崩溃
+            value: _styles.contains(p?.preferredExplanationStyle) ? p!.preferredExplanationStyle : null,
             items: const [
               DropdownMenuItem(value: 'step_by_step', child: Text('分步讲解')),
               DropdownMenuItem(value: 'concise', child: Text('简洁')),
@@ -60,10 +81,15 @@ class _AiProfilePageState extends ConsumerState<AiProfilePage> {
           ),
           const SizedBox(height: 12),
           FilledButton(onPressed: () async {
-            await actions.saveProfile(goal: _goal.text);
-            if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+            try {
+              await actions.saveProfile(goal: _goal.text);
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存')));
+            } catch (e) {
+              if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('保存失败：$e')));
+            }
           }, child: const Text('保存画像')),
-        ]),
+          ]);
+        },
       ),
     );
   }

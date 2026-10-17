@@ -6,6 +6,12 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import '../core/config.dart';
 import '../services/server_discovery_service.dart';
+import '../providers/question_provider.dart';
+import '../providers/stats_provider.dart';
+import '../providers/review_provider.dart';
+import '../providers/prompt_template_provider.dart';
+import '../providers/strength_provider.dart';
+import '../providers/ai_memory_provider.dart';
 
 class ServerConfigPage extends ConsumerStatefulWidget {
   const ServerConfigPage({super.key});
@@ -49,6 +55,19 @@ class _ServerConfigPageState extends ConsumerState<ServerConfigPage> {
     AppConfig.setBaseUrl(normalized);
     // 持久化：重启后 main.dart 会自动恢复，无需重输
     await Hive.box('settings').put('baseUrl', normalized);
+    // 换服务器（或从内网切公网域名）后，所有按旧地址缓存的 FutureProvider
+    // 必须清空，否则各页仍显示旧服务器数据
+    ref.read(questionFilterProvider.notifier).state = const QuestionFilter();
+    ref.invalidate(questionListProvider);
+    ref.invalidate(subjectsProvider);
+    ref.invalidate(overviewStatsProvider);
+    ref.invalidate(errorsStatsProvider);
+    ref.invalidate(masteryStatsProvider);
+    ref.invalidate(weeklyStatsProvider);
+    ref.invalidate(reviewCardsProvider);
+    ref.invalidate(promptTemplatesProvider);
+    ref.invalidate(strengthsProvider);
+    ref.invalidate(aiProfileProvider);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已保存：${AppConfig.baseUrl}')));
       context.go('/login');

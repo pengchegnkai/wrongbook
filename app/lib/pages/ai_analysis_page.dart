@@ -87,6 +87,8 @@ class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
           extra: _extraCtrl.text.trim().isEmpty ? null : _extraCtrl.text.trim(),
         );
     _stopTicker();
+    // 无论成功失败，历史页下次进入都重新拉取（成功时可见新记录）
+    ref.invalidate(analysisHistoryProvider);
   }
 
   @override
@@ -219,7 +221,7 @@ class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
                       if (analysis.strength != null)
                         Padding(
                           padding: const EdgeInsets.only(left: 8),
-                          child: Text('强度: $analysis.strength',
+                          child: Text('强度: ${analysis.strength}',
                               style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
                         ),
                       const Spacer(),
@@ -282,11 +284,13 @@ class _QuestionPickerState extends ConsumerState<_QuestionPicker> {
     });
     try {
       final data = await ApiClient().get('/questions', query: {'page': 1, 'pageSize': 30}) as Map;
+      if (!mounted) return;
       setState(() {
         _items = (data['items'] as List).cast<Map<String, dynamic>>();
         _loading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString().startsWith('Exception:') ? e.toString().substring(10) : e.toString();
         _loading = false;
@@ -329,10 +333,11 @@ class _QuestionPickerState extends ConsumerState<_QuestionPicker> {
         for (final q in _items)
           DropdownMenuItem(
             value: q['id'] as int?,
-            child: Text(
-              '${(q['original_question'] ?? '').toString().length > 24 ? (q['original_question'] as String).substring(0, 24) : q['original_question']}…',
-              overflow: TextOverflow.ellipsis,
-            ),
+            child: Builder(builder: (context) {
+              final text = q['original_question']?.toString() ?? '';
+              final shown = text.length > 24 ? text.substring(0, 24) : text;
+              return Text('$shown…', overflow: TextOverflow.ellipsis);
+            }),
           ),
       ],
       onChanged: widget.onSelect,

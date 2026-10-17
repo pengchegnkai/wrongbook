@@ -46,10 +46,10 @@ class HomePage extends ConsumerWidget {
                         children: [
                           SizedBox(width: 220, child: _NavPanel(onTap: (p) => context.push(p))),
                           const VerticalDivider(width: 1),
-                          Expanded(child: _HomeContent(ref)),
+                          const Expanded(child: _HomeContent()),
                         ],
                       )
-                    : _HomeContent(ref),
+                    : const _HomeContent(),
               ),
             ],
           ),
@@ -85,11 +85,10 @@ class _NavPanel extends StatelessWidget {
 
 /// 右侧/主内容区
 class _HomeContent extends ConsumerWidget {
-  _HomeContent(this.ref);
-  final WidgetRef ref;
+  const _HomeContent();
 
   @override
-  Widget build(BuildContext context, WidgetRef _) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(overviewStatsProvider);
     return stats.when(
       loading: () => const PageSkeleton(itemCount: 4),

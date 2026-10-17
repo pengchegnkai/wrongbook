@@ -32,5 +32,5 @@ class SubjectStat {
   const SubjectStat(this.label, this.count);
 
   factory SubjectStat.fromJson(Map<String, dynamic> j) =>
-      SubjectStat('${j['label'] ?? j['subject'] ?? j['error_type'] ?? j['mastery'] ?? j['day'] ?? ''}', j['n'] ?? 0);
+      SubjectStat('${j['label'] ?? j['subject'] ?? j['chapter'] ?? j['error_type'] ?? j['mastery'] ?? j['day'] ?? ''}', j['n'] ?? 0);
 }

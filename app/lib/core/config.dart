@@ -13,10 +13,15 @@ class AppConfig {
   /// 快速判 false，推理改走后端 /api/ai/* 代理（后端在服务器本机连 llama）。
   static String get llamaBase {
     final uri = Uri.tryParse(_baseUrl);
-    if (uri != null && uri.scheme == 'https' && uri.host.isNotEmpty && !uri.hasPort) {
+    if (uri == null || uri.host.isEmpty) return '$_baseUrl:8080';
+    if (uri.scheme == 'https' && !uri.hasPort) {
+      // 公网域名模式：8080 不经隧道暴露，直连不可达 → 返回 baseUrl，
+      // /health 立即 404 → isAvailable 快速判 false，推理走后端 /api/ai/* 代理
       return _baseUrl;
     }
-    return '$_baseUrl:8080';
+    // 内网模式：统一剥掉已有端口改拼 8080（baseUrl=http://ip:3000 时
+    // 直接拼会得到 ip:3000:8080 非法 URL）
+    return '${uri.scheme}://${uri.host}:8080';
   }
 
   static void setBaseUrl(String url) {

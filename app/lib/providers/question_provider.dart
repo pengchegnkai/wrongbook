@@ -61,38 +61,52 @@ class QuestionListState {
 class QuestionListNotifier extends StateNotifier<QuestionListState> {
   final Ref ref;
   int _page = 1;
+  /// 请求序号：refresh/筛选切换后使在途的旧响应作废，防止脏数据混入
+  int _seq = 0;
   QuestionListNotifier(this.ref) : super(const QuestionListState());
 
   Future<void> refresh() async {
     _page = 1;
+    _seq++;
     state = QuestionListState(loading: state.loading, items: state.items, total: state.total);
-    await _load(replace: true);
+    await _load(replace: true, seq: _seq);
   }
 
   Future<void> loadMore() async {
     if (state.loading) return;
+    // 已加载满 total 时不再请求越界页
+    if (state.items.length >= state.total) return;
     _page++;
-    await _load(replace: false);
+    await _load(replace: false, seq: _seq);
   }
 
-  Future<void> _load({required bool replace}) async {
+  Future<void> _load({required bool replace, required int seq}) async {
     state = QuestionListState(loading: true, items: state.items, total: state.total, error: null);
     try {
       final filter = ref.read(questionFilterProvider);
       final data = await ApiClient().get('/questions', query: filter.toQuery(_page, 20)) as Map;
+      // 响应期间发生了 refresh/筛选切换 → 本次结果作废
+      if (seq != _seq) return;
       final items = (data['items'] as List).map((e) => Question.fromJson(e)).toList();
       state = QuestionListState(
         items: replace ? items : [...state.items, ...items],
         total: data['total'] ?? 0,
       );
     } catch (e) {
+      if (seq != _seq) return;
+      if (!replace && _page > 1) _page--; // 加载更多失败：回滚页码，下次重试本页
       state = QuestionListState(error: e.toString(), items: state.items, total: state.total);
     }
   }
 
   Future<void> delete(int id) async {
-    await ApiClient().delete('/questions/$id');
-    await refresh();
+    try {
+      await ApiClient().delete('/questions/$id');
+      await refresh();
+    } catch (e) {
+      state = QuestionListState(error: '删除失败：$e', items: state.items, total: state.total, loading: false);
+      rethrow;
+    }
   }
 }
 

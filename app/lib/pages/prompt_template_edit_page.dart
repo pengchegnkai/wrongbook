@@ -16,6 +16,7 @@ class PromptTemplateEditPage extends ConsumerStatefulWidget {
 class _PromptTemplateEditPageState extends ConsumerState<PromptTemplateEditPage> {
   final _name = TextEditingController();
   final _content = TextEditingController();
+  final _subjectCtrl = TextEditingController();
   String? _subject;
   bool _isDefault = false;
 
@@ -27,8 +28,17 @@ class _PromptTemplateEditPageState extends ConsumerState<PromptTemplateEditPage>
       _name.text = t['name'] ?? '';
       _content.text = t['templateContent'] ?? t['template_content'] ?? '';
       _subject = t['subject'];
+      _subjectCtrl.text = _subject ?? '';
       _isDefault = t['isDefault'] == true || t['is_default'] == true;
     }
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _content.dispose();
+    _subjectCtrl.dispose();
+    super.dispose();
   }
 
   @override
@@ -48,7 +58,7 @@ class _PromptTemplateEditPageState extends ConsumerState<PromptTemplateEditPage>
         ]),
         const SizedBox(height: 12),
         TextField(decoration: const InputDecoration(labelText: '适用学科（可空=通用）'),
-          onChanged: (v) => _subject = v.isEmpty ? null : v, controller: TextEditingController(text: _subject ?? '')),
+          onChanged: (v) => _subject = v.isEmpty ? null : v, controller: _subjectCtrl),
         SwitchListTile(title: const Text('设为默认模板'), value: _isDefault, onChanged: (v) => setState(() => _isDefault = v)),
         const SizedBox(height: 8),
         FilledButton(onPressed: () async {
@@ -63,8 +73,14 @@ class _PromptTemplateEditPageState extends ConsumerState<PromptTemplateEditPage>
             templateContent: _content.text,
             isDefault: _isDefault,
           );
-          await ref.read(templateSaveProvider)(t);
-          if (mounted) context.pop();
+          try {
+            await ref.read(templateSaveProvider)(t);
+            if (mounted) context.pop();
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('保存失败：$e')));
+            }
+          }
         }, child: const Text('保存')),
       ]),
     );

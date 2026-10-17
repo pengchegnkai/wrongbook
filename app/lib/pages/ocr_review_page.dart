@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../core/api_client.dart';
 import '../core/ui_states.dart';
 import '../providers/ocr_provider.dart';
+import '../providers/stats_provider.dart';
 
 class OcrReviewPage extends ConsumerStatefulWidget {
   const OcrReviewPage({super.key});
@@ -106,6 +107,7 @@ class _OcrReviewPageState extends ConsumerState<OcrReviewPage> {
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('保存了 $okCount/${items.length} 题，中断原因：$failMsg。可点保存继续（已成功的不会重复）')));
     } else {
+      ref.invalidate(overviewStatsProvider);
       if (mounted) context.go('/questions');
     }
   }

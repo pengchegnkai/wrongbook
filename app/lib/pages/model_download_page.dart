@@ -53,8 +53,9 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
                 url: _url.text.trim(),
                 fileName: _name.text.trim(),
                 expectedSha256: _sha.text.trim().isEmpty ? null : _sha.text.trim(),
-                onProgress: (p) => setState(() => _progress = p),
+                onProgress: (p) { if (mounted) setState(() => _progress = p); },
               );
+              if (!mounted) return;
               // 匹配到注册表中的模型则标记已下载
               final matched = models.where((m) => m.fileName == _name.text.trim()).toList();
               if (matched.isNotEmpty) {
@@ -63,9 +64,9 @@ class _ModelDownloadPageState extends ConsumerState<ModelDownloadPage> {
               }
               setState(() => _msg = '下载完成${_sha.text.trim().isEmpty ? '（未校验 SHA256）' : '，SHA256 校验通过'}');
             } catch (e) {
-              setState(() => _msg = '下载失败：$e');
+              if (mounted) setState(() => _msg = '下载失败：$e');
             } finally {
-              setState(() => _busy = false);
+              if (mounted) setState(() => _busy = false);
             }
           },
         ),

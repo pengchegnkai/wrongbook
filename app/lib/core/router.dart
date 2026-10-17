@@ -27,7 +27,6 @@ import '../pages/profile_page.dart';
 import '../pages/scan_page.dart';
 import '../pages/ocr_review_page.dart';
 import '../pages/pending_queue_page.dart';
-import '../pages/analysis_result_page.dart';
 import '../pages/analysis_history_page.dart';
 import '../pages/prompt_template_list_page.dart';
 import '../pages/prompt_template_edit_page.dart';
@@ -89,7 +88,6 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/scan', builder: (_, __) => const ScanPage()),
       GoRoute(path: '/ocr-review', builder: (_, __) => const OcrReviewPage()),
       GoRoute(path: '/pending-queue', builder: (_, __) => const PendingQueuePage()),
-      GoRoute(path: '/analysis-result', builder: (_, __) => const AnalysisResultPage()),
       GoRoute(path: '/analysis-history', builder: (_, __) => const AnalysisHistoryPage()),
       GoRoute(path: '/prompt-templates', builder: (_, __) => const PromptTemplateListPage()),
       GoRoute(path: '/prompt-templates/edit', builder: (_, s) {

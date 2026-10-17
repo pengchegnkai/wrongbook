@@ -15,6 +15,7 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
   String? _type;
   final _comment = TextEditingController();
   bool _done = false;
+  bool _submitting = false;
   String? _error;
 
   @override
@@ -33,18 +34,21 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
               TextField(controller: _comment, maxLines: 3, decoration: const InputDecoration(labelText: '补充说明（可空）')),
               const SizedBox(height: 16),
               if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
-              FilledButton(onPressed: _type == null ? null : () async {
+              FilledButton(onPressed: (_type == null || _submitting) ? null : () async {
+                setState(() => _submitting = true);
                 try {
                   await FeedbackService().submit(
                     questionId: widget.questionId,
                     feedbackType: _type!,
                     comment: _comment.text,
                   );
-                  setState(() => _done = true);
+                  if (mounted) setState(() => _done = true);
                 } catch (e) {
-                  setState(() => _error = e.toString());
+                  if (mounted) setState(() => _error = e.toString());
+                } finally {
+                  if (mounted) setState(() => _submitting = false);
                 }
-              }, child: const Text('提交反馈')),
+              }, child: Text(_submitting ? '提交中…' : '提交反馈')),
             ]),
     );
   }

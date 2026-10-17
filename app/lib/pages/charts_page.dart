@@ -19,7 +19,13 @@ class ChartsPage extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const Text('错因分布（柱状图）'),
-          SizedBox(height: 200, child: errors.maybeWhen(
+          SizedBox(height: 200, child: errors.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: TextButton(
+              onPressed: () => ref.invalidate(errorsStatsProvider),
+              child: Text('加载失败，点此重试\n$e', textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 12, color: Colors.red))),
+            ),
             data: (rows) => rows.isEmpty
                 ? const Center(child: Text('暂无数据'))
                 : BarChart(BarChartData(
@@ -32,16 +38,20 @@ class ChartsPage extends ConsumerWidget {
                     titlesData: FlTitlesData(
                       bottomTitles: AxisTitles(sideTitles: SideTitles(
                         showTitles: true, getTitlesWidget: (v, _) => Text(
-                          (rows[v.toInt()]['error_type'] ?? '') as String,
+                          (rows[v.toInt().clamp(0, rows.length - 1)]['error_type'] ?? '') as String,
                           style: const TextStyle(fontSize: 9))),
                       ),
                     ),
                   )),
-            orElse: () => const Center(child: CircularProgressIndicator()),
           )),
           const Divider(height: 32),
           const Text('掌握度分布（环形图）'),
-          SizedBox(height: 200, child: mastery.maybeWhen(
+          SizedBox(height: 200, child: mastery.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: TextButton(
+              onPressed: () => ref.invalidate(masteryStatsProvider),
+              child: Text('加载失败，点此重试', style: const TextStyle(fontSize: 12, color: Colors.red))),
+            ),
             data: (rows) => rows.isEmpty
                 ? const Center(child: Text('暂无数据'))
                 : PieChart(PieChartData(sections: [
@@ -52,11 +62,15 @@ class ChartsPage extends ConsumerWidget {
                         color: r['mastery'] == 'red' ? Colors.red : r['mastery'] == 'yellow' ? Colors.amber : Colors.green,
                       ),
                   ], centerSpaceRadius: 48)),
-            orElse: () => const Center(child: CircularProgressIndicator()),
           )),
           const Divider(height: 32),
           const Text('近 7 天录入趋势（折线图）'),
-          SizedBox(height: 200, child: weekly.maybeWhen(
+          SizedBox(height: 200, child: weekly.when(
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (e, _) => Center(child: TextButton(
+              onPressed: () => ref.invalidate(weeklyStatsProvider),
+              child: Text('加载失败，点此重试', style: const TextStyle(fontSize: 12, color: Colors.red))),
+            ),
             data: (rows) => rows.isEmpty
                 ? const Center(child: Text('暂无数据'))
                 : LineChart(LineChartData(
@@ -71,11 +85,11 @@ class ChartsPage extends ConsumerWidget {
                     titlesData: FlTitlesData(
                       bottomTitles: AxisTitles(sideTitles: SideTitles(
                         showTitles: true, getTitlesWidget: (v, _) => Text(
-                          (rows[v.toInt()]['day'] ?? '') as String, style: const TextStyle(fontSize: 9))),
+                          (rows[v.toInt().clamp(0, rows.length - 1)]['day'] ?? '') as String,
+                          style: const TextStyle(fontSize: 9))),
                       ),
                     ),
                   )),
-            orElse: () => const Center(child: CircularProgressIndicator()),
           )),
         ],
       ),

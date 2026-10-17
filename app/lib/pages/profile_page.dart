@@ -37,13 +37,12 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         FilledButton(onPressed: () async {
           try {
             await AuthService.changePassword(_old.text, _new.text);
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('密码已修改，请重新登录')));
-              await ref.read(currentUserProvider.notifier).logout();
-              if (mounted) ref.read(currentUserProvider.notifier).logout();
-            }
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('密码已修改，请重新登录')));
+            await ref.read(currentUserProvider.notifier).logout();
+            if (mounted) context.go('/login');
           } catch (e) {
-            setState(() => _msg = e.toString());
+            if (mounted) setState(() => _msg = e.toString());
           }
         }, child: const Text('修改密码')),
       ]),

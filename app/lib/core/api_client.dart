@@ -122,6 +122,13 @@ class AuthInterceptor extends Interceptor {
         _refreshing = completer;
         try {
           refreshed = await AuthService.tryRefresh();
+        } on DioException catch (e) {
+          // 刷新请求自身断网/5xx：凭据未必失效 → 不清 token 不登出
+          if (AuthService.isNetworkError(e) || (e.response?.statusCode ?? 0) >= 500) {
+            NetworkStatus.setOffline(true);
+            return handler.next(err);
+          }
+          refreshed = false;
         } catch (_) {
           refreshed = false;
         } finally {

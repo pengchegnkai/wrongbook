@@ -16,6 +16,9 @@ class SyncService {
           await ApiClient().post('/questions', body: task['payload']);
           await _queue.markDone(task['id']);
           ok++;
+        } else {
+          // 未识别的任务不能留在 pending：否则每次同步都被反复遍历，队列永不消化
+          await _queue.markFailed(task['id'], 'unsupported action: ${task['action']}');
         }
       } catch (e) {
         await _queue.markFailed(task['id'], e.toString());

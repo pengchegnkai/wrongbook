@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../core/api_client.dart';
 import '../core/ui_states.dart';
 import '../providers/question_provider.dart';
+import '../providers/stats_provider.dart';
 
 class QuestionDetailPage extends ConsumerWidget {
   const QuestionDetailPage({super.key, required this.id});
@@ -30,6 +31,9 @@ class QuestionDetailPage extends ConsumerWidget {
     if (ok != true || !context.mounted) return;
     try {
       await ApiClient().delete('/questions/$id');
+      // 返回列表前先失效缓存，否则列表仍显示已删除的错题
+      ref.invalidate(questionListProvider);
+      ref.invalidate(overviewStatsProvider);
       if (context.mounted) context.pop();
     } catch (e) {
       if (context.mounted) {
@@ -67,7 +71,7 @@ class QuestionDetailPage extends ConsumerWidget {
                 message: _msg(e),
                 onRetry: () => ref.invalidate(questionDetailProvider(id)),
               ),
-              data: (q) => _DetailContent(q: q, id: id, ref: ref),
+              data: (q) => _DetailContent(q: q, id: id),
             ),
           ),
         ],
@@ -77,21 +81,23 @@ class QuestionDetailPage extends ConsumerWidget {
 }
 
 class _DetailContent extends ConsumerWidget {
-  _DetailContent({required this.q, required this.id, required this.ref});
+  const _DetailContent({required this.q, required this.id});
   final dynamic q;
   final String id;
-  final WidgetRef ref;
 
-  Future<void> _updateMastery(String mastery) async {
+  Future<void> _updateMastery(BuildContext context, WidgetRef ref, String mastery) async {
     try {
       await ApiClient().put('/questions/$id', body: {'mastery': mastery});
       ref.invalidate(questionDetailProvider(id));
-      if (ref.context.mounted) {
-        ScaffoldMessenger.of(ref.context).showSnackBar(const SnackBar(content: Text('掌握度已更新')));
+      // 掌握度变化会影响列表与首页统计
+      ref.invalidate(questionListProvider);
+      ref.invalidate(overviewStatsProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('掌握度已更新')));
       }
     } catch (e) {
-      if (ref.context.mounted) {
-        ScaffoldMessenger.of(ref.context)
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text('更新失败：${_msg(e)}')));
       }
     }
@@ -158,7 +164,7 @@ class _DetailContent extends ConsumerWidget {
                   child: ChoiceChip(
                     label: Text(e.value, style: const TextStyle(fontSize: 12)),
                     selected: q.mastery == e.key,
-                    onSelected: (_) => _updateMastery(e.key),
+                    onSelected: (_) => _updateMastery(context, ref, e.key),
                   ),
                 ),
               ),

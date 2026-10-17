@@ -78,8 +78,12 @@ class _ConfigFormState extends ConsumerState<_ConfigForm> {
         onChanged: (v) => _questionType = v.isEmpty ? null : v),
       const SizedBox(height: 8),
       FilledButton(onPressed: _strength == null ? null : () async {
-        await ref.read(strengthConfigSaveProvider)(_subject, _questionType, _strength!);
-        if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存，重启分析后生效')));
+        try {
+          await ref.read(strengthConfigSaveProvider)(_subject, _questionType, _strength!);
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已保存，重启分析后生效')));
+        } catch (e) {
+          if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('保存失败：$e')));
+        }
       }, child: const Text('保存配置')),
     ]);
   }

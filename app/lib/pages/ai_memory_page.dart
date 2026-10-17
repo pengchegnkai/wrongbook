@@ -77,8 +77,14 @@ class AiMemoryPage extends ConsumerWidget {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
         FilledButton(onPressed: () async {
-          await actions.create(type.text, key.text, value.text);
-          if (context.mounted) Navigator.pop(context);
+          try {
+            await actions.create(type.text, key.text, value.text);
+            if (context.mounted) Navigator.pop(context);
+          } catch (e) {
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('保存失败：$e')));
+            }
+          }
         }, child: const Text('保存')),
       ],
     ));
