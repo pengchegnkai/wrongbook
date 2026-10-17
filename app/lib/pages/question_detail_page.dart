@@ -109,7 +109,7 @@ class _DetailContent extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef _) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     return ListView(
       padding: const EdgeInsets.all(16),
