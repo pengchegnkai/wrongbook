@@ -30,7 +30,7 @@ class _FeedbackPageState extends ConsumerState<FeedbackPage> {
                 child: ChoiceChip(label: Text(e.value), selected: _type == e.key, onSelected: (_) => setState(() => _type = e.key)),
               )).toList()),
               const SizedBox(height: 12),
-              TextField(controller: _comment, maxLines: 3, decoration: const InputDecoration(labelText: '补充说明（可空）', border: OutlineInputBorder())),
+              TextField(controller: _comment, maxLines: 3, decoration: const InputDecoration(labelText: '补充说明（可空）')),
               const SizedBox(height: 16),
               if (_error != null) Text(_error!, style: const TextStyle(color: Colors.red)),
               FilledButton(onPressed: _type == null ? null : () async {

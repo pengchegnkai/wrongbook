@@ -16,7 +16,9 @@ async function chat({ prompt, strength, systemPrompt }) {
     temperature: 0.7,
     stream: false
   };
-  // 采样 strength.sampleCount 次取最长/最优（简单策略：取长度最长者作为"最优"）
+  // 采样 strength.sampleCount 次取最优
+  // 策略：按【答案】段长度择优。答案为空的样本（token 耗尽只剩思考）不参与比较，
+  // 否则"取最长文本"会偏向只输出思考、没有答案的劣质结果。
   let best = null;
   for (let i = 0; i < (strength.sampleCount || 1); i++) {
     const r = await fetch(`${BASE()}/v1/chat/completions`, {
@@ -28,21 +30,24 @@ async function chat({ prompt, strength, systemPrompt }) {
     if (!r.ok) throw new Error(`llama-server 返回 ${r.status}`);
     const data = await r.json();
     const choice = data.choices?.[0]?.message || {};
-    // 推理模型（如 MiniCPM5）把思考放在 reasoning_content，最终答案在 content；
-    // 两者都可能有值，也可能只有思考（token 不足截断时）。合并输出：
-    const parts = [];
-    if (choice.reasoning_content) parts.push('【思考】' + choice.reasoning_content.trim());
-    if (choice.content && choice.content.trim()) parts.push('【答案】' + choice.content.trim());
-    const text = parts.join('\n\n') || (choice.content || '');
-    if (!best || text.length > best.text.length) {
+    // 推理模型（如 MiniCPM5）把思考放在 reasoning_content，最终答案在 content
+    const reasoning = (choice.reasoning_content || '').trim();
+    const answer = (choice.content || '').trim();
+    if (!reasoning && !answer) continue; // 空样本
+    const text = answer
+      ? (reasoning ? '【思考】' + reasoning + '\n\n【答案】' + answer : answer)
+      : '【思考】' + reasoning; // 仅思考（截断）：参与返回但不参与择优得分
+    const score = answer.length;
+    if (!best || score > best.score) {
       best = {
         text,
+        score,
         model: data.model || MODEL_NAME(),
-        totalTokens: data.usage?.total_tokens,
-        firstTokenMs: null
+        totalTokens: data.usage?.total_tokens
       };
     }
   }
+  if (!best) throw new Error('模型未生成有效内容（token 预算内未产出答案，可尝试更高思考强度）');
   return best;
 }
 

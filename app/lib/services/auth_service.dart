@@ -1,4 +1,5 @@
 /// services/auth_service.dart —— 注册 / 登录 / 刷新 / 自动登录
+import 'package:dio/dio.dart';
 import '../core/api_client.dart';
 import '../models/user.dart';
 import 'token_storage.dart';
@@ -65,9 +66,11 @@ class AuthService {
   /// 启动自动登录：
   /// - 无本地 token → null
   /// - 登录时未勾选「记住我」→ 清除并返回 null（需手动登录）
-  /// - access token 本地已过期（JWT exp）→ 清除并返回 null
+  /// - access token 本地已过期 → 先尝试静默刷新（refresh 很可能仍有效，
+  ///   与运行期 401 自动刷新行为一致），失败才清除
   /// - 网络可用：/auth/me 校验（401 时拦截器已尝试刷新并重试）
-  /// - 网络不可用且 token 本地未过期 → 返回离线 User（可进 App，页面顶部显示离线提示条）
+  /// - 仅连接类错误（断网）且仍持有 token → 返回离线 User（可进 App，顶部离线条）；
+  ///   服务器 5xx/响应异常等不装作已登录，向上抛 → 进登录页
   static Future<User?> autoLogin() async {
     if (!await TokenStorage.hasTokens()) return null;
     if (!TokenStorage.rememberSync) {
@@ -78,21 +81,26 @@ class AuthService {
     final exp = TokenStorage.parseAccessExp(access);
     final now = DateTime.now().millisecondsSinceEpoch ~/ 1000;
     if (exp > 0 && exp < now) {
-      await TokenStorage.clearAll();
-      return null;
+      final refreshed = await tryRefresh();
+      if (!refreshed) {
+        await TokenStorage.clearAll();
+        return null;
+      }
     }
     try {
       return await me();
-    } catch (_) {
-      // 拦截器已处理 token 过期（过期会清除凭据）；
-      // 走到这里还持有 token → 只可能是网络问题 → 允许离线进入
-      if (!await TokenStorage.hasTokens()) return null;
-      return User(
-        id: TokenStorage.userIdSync ?? 0,
-        username: TokenStorage.usernameSync ?? 'offline',
-        nickname: TokenStorage.usernameSync,
-        status: 'active',
-      );
+    } on DioException catch (e) {
+      final networkDown = e.type == DioExceptionType.connectionError ||
+          e.type == DioExceptionType.connectionTimeout;
+      if (networkDown && await TokenStorage.hasTokens()) {
+        return User(
+          id: TokenStorage.userIdSync ?? 0,
+          username: TokenStorage.usernameSync ?? 'offline',
+          nickname: TokenStorage.usernameSync,
+          status: 'active',
+        );
+      }
+      rethrow; // 5xx/响应异常/401 已清凭据等 → bootstrap 置为未登录
     }
   }
 

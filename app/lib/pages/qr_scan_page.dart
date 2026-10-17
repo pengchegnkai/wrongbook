@@ -22,7 +22,7 @@ class _QrScanPageState extends State<QrScanPage> {
         child: Column(children: [
           const Text('摄像头扫码插件未集成（TODO：引入 mobile_scanner 后替换此页）。请手动输入二维码中的地址：'),
           const SizedBox(height: 16),
-          TextField(controller: _ctrl, decoration: const InputDecoration(labelText: '地址', border: OutlineInputBorder())),
+          TextField(controller: _ctrl, decoration: const InputDecoration(labelText: '地址')),
           const SizedBox(height: 16),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(_ctrl.text.trim()),

@@ -62,7 +62,6 @@ class _ServerConfigPageState extends ConsumerState<ServerConfigPage> {
             decoration: const InputDecoration(
               labelText: '服务器地址',
               hintText: '如 192.168.1.100:3000',
-              border: OutlineInputBorder(),
               helperText: '在 Termux 的 start-all.sh 输出中可查看内网地址',
             ),
           ),

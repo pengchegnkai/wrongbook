@@ -60,18 +60,27 @@ class ApiClient {
 /// - 401 自动用 refreshToken 换新 token 并重试原请求：
 ///   * Completer 防止并发 401 触发多次刷新
 ///   * authRetried 标记只重试一次，防死循环
-///   * /auth/ 路径不自动刷新（登录/刷新接口自身的 401 直接透传）
-/// - 连接失败/超时：只标记离线，不清 token（断网 ≠ 未登录）
+///   * /auth/login /auth/register /auth/refresh 自身的 401 不自动刷新（精确匹配）
+/// - 连接失败/连接超时：只标记离线，不清 token（断网 ≠ 未登录）；
+///   receiveTimeout 不算离线（服务端可能仍在处理，如 OCR/AI 长请求）
+/// - token 彻底失效清凭据时触发 onCredentialsInvalid 回调（由 main 接线到
+///   登出状态与路由，否则守卫仍认为已登录，页面会卡死在失效会话里）
 class AuthInterceptor extends Interceptor {
   final Dio _dio;
   Completer<bool>? _refreshing;
+
+  /// 凭据被拦截器清除时回调（main.dart 里接到 currentUserProvider / 路由）
+  static void Function()? onCredentialsInvalid;
+
   AuthInterceptor(this._dio);
+
+  // 这些接口自身的 401 是"凭据错误"的正常返回，不触发刷新
+  static const _noRefreshPaths = {'/auth/login', '/auth/register', '/auth/refresh'};
 
   static bool _isNetworkError(DioExceptionType t) =>
       t == DioExceptionType.connectionError ||
       t == DioExceptionType.connectionTimeout ||
-      t == DioExceptionType.sendTimeout ||
-      t == DioExceptionType.receiveTimeout;
+      t == DioExceptionType.sendTimeout;
 
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
@@ -96,10 +105,12 @@ class AuthInterceptor extends Interceptor {
       return handler.next(err);
     }
     final path = err.requestOptions.path;
-    if (err.response?.statusCode == 401 && !path.contains('/auth/')) {
+    final noRefresh = _noRefreshPaths.any((p) => path.contains(p));
+    if (err.response?.statusCode == 401 && !noRefresh) {
       // 已重试过仍 401：token 彻底失效，清凭据终止循环
       if (err.requestOptions.extra['authRetried'] == true) {
         await TokenStorage.clearAll();
+        onCredentialsInvalid?.call();
         return handler.next(err);
       }
       var refreshed = false;
@@ -132,6 +143,7 @@ class AuthInterceptor extends Interceptor {
         }
       }
       await TokenStorage.clearAll();
+      onCredentialsInvalid?.call();
     }
     handler.next(err);
   }

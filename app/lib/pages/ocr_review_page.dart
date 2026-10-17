@@ -21,6 +21,7 @@ class OcrReviewPage extends ConsumerStatefulWidget {
 class QEdit {
   final qCtrl = TextEditingController();
   final aCtrl = TextEditingController();
+  bool saved = false; // 已成功保存到服务端（重试时跳过，防重复）
   QEdit({String q = '', String a = ''}) {
     qCtrl.text = q;
     aCtrl.text = a;
@@ -46,6 +47,9 @@ class _OcrReviewPageState extends ConsumerState<OcrReviewPage> {
     _autoStarted = true;
     final extra = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     _imagePath = extra?['imagePath'] as String?;
+    // 进入页面时重置全局 OCR 状态（作废在途旧请求），
+    // ref 在 didChangeDependencies 中可用；不要放在 dispose（彼时 ref 已不可用）
+    ref.read(ocrProvider.notifier).reset();
     if (_imagePath != null) {
       ref.read(ocrProvider.notifier).recognize(_imagePath!);
     }
@@ -56,13 +60,12 @@ class _OcrReviewPageState extends ConsumerState<OcrReviewPage> {
     for (final e in _edits) {
       e.dispose();
     }
-    ref.read(ocrProvider.notifier).reset();
     super.dispose();
   }
 
   /// 结果到达后填充编辑框（只填一次，避免覆盖用户修改）
   void _applyResult(dynamic result) {
-    if (_filled) return;
+    if (!mounted || _filled) return;
     _filled = true;
     final qs = result.questions as List;
     setState(() {
@@ -80,26 +83,28 @@ class _OcrReviewPageState extends ConsumerState<OcrReviewPage> {
       return;
     }
     setState(() => _saving = true);
-    var ok = 0;
     String? failMsg;
     try {
       final api = ApiClient();
+      // 已成功的题打 saved 标，重试时跳过，避免重复插入
       for (final e in items) {
+        if (e.saved) continue;
         await api.post('/questions', body: {
           'originalQuestion': e.qCtrl.text.trim(),
           'myAnswer': e.aCtrl.text.trim().isEmpty ? null : e.aCtrl.text.trim(),
           'source': 'ocr',
         });
-        ok++;
+        e.saved = true;
       }
     } catch (err) {
       failMsg = err.toString().startsWith('Exception:') ? err.toString().substring(10) : err.toString();
     }
     if (!mounted) return;
-    setState(() => _saving = false);
+    final okCount = items.where((e) => e.saved).length;
     if (failMsg != null) {
+      setState(() => _saving = false);
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('保存了 $ok/$items.length 题，中断原因：$failMsg')));
+          .showSnackBar(SnackBar(content: Text('保存了 $okCount/${items.length} 题，中断原因：$failMsg。可点保存继续（已成功的不会重复）')));
     } else {
       if (mounted) context.go('/questions');
     }
@@ -127,7 +132,7 @@ class _OcrReviewPageState extends ConsumerState<OcrReviewPage> {
           children: [
             if (path != null && File(path).existsSync())
               ClipRRect(
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(16),
                 child: Image.file(File(path), fit: BoxFit.contain),
               ),
             const SizedBox(height: 24),
@@ -163,7 +168,7 @@ class _OcrReviewPageState extends ConsumerState<OcrReviewPage> {
                 children: [
                   if (path != null && File(path).existsSync()) ...[
                     ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                       child: Image.file(File(path), fit: BoxFit.contain),
                     ),
                     const SizedBox(height: 8),
@@ -295,7 +300,7 @@ class _QuestionEditor extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,7 +317,7 @@ class _QuestionEditor extends StatelessWidget {
             maxLines: 4,
             decoration: const InputDecoration(
               labelText: '原题',
-              border: OutlineInputBorder(),
+
               isDense: true,
             ),
           ),
@@ -322,7 +327,7 @@ class _QuestionEditor extends StatelessWidget {
             maxLines: 3,
             decoration: const InputDecoration(
               labelText: '我的答案（可留空）',
-              border: OutlineInputBorder(),
+
               isDense: true,
             ),
           ),

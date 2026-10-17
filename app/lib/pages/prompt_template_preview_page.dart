@@ -48,7 +48,7 @@ class _PromptTemplatePreviewPageState extends ConsumerState<PromptTemplatePrevie
           Padding(
             padding: const EdgeInsets.only(bottom: 8),
             child: TextField(controller: e.value, decoration: InputDecoration(
-              labelText: e.key, border: const OutlineInputBorder(), isDense: true)),
+              labelText: e.key, isDense: true)),
           ),
         FilledButton.icon(icon: const Icon(Icons.visibility), label: const Text('渲染预览'), onPressed: _preview),
         const SizedBox(height: 16),

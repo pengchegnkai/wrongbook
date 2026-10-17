@@ -14,6 +14,22 @@ const router = express.Router();
 const TMP_DIR = path.join(__dirname, '..', 'tmp');
 fs.mkdirSync(TMP_DIR, { recursive: true });
 
+// 兜底清扫：启动时 + 每小时删除超过 2 小时的残留临时文件。
+// 覆盖 multer 在 fileFilter/大小限制中断后残留的部分写入文件等所有泄漏路径
+function sweepTmp() {
+  try {
+    const cutoff = Date.now() - 2 * 60 * 60 * 1000;
+    for (const name of fs.readdirSync(TMP_DIR)) {
+      const p = path.join(TMP_DIR, name);
+      try {
+        if (fs.statSync(p).mtimeMs < cutoff) fs.unlink(p, () => {});
+      } catch (_) { /* 单个文件失败忽略 */ }
+    }
+  } catch (_) { /* 目录读取失败忽略 */ }
+}
+sweepTmp();
+setInterval(sweepTmp, 60 * 60 * 1000).unref();
+
 const upload = multer({
   storage: multer.diskStorage({
     destination: (req, file, cb) => cb(null, TMP_DIR),
@@ -40,10 +56,8 @@ function runTesseract(filePath, lang) {
         env: { ...process.env, KMP_AFFINITY: 'disabled', OMP_NUM_THREADS: '1' },
       },
       (err, stdout, stderr) => {
-        if (err) return resolve(null);
-        const text = String(stdout || '').trim();
-        if (!text) return resolve(null);
-        resolve(text);
+        if (err) return resolve(null); // 执行失败（未安装/语言包缺失/超时/崩溃）
+        resolve(String(stdout || '').trim()); // 成功：可能为空串（空白/过曝图）
       }
     );
   });
@@ -153,6 +167,14 @@ router.post('/recognize', upload.single('image'), async (req, res, next) => {
         text = engText;
         lang = 'eng';
       }
+    }
+    if (!text) {
+      // 识别执行成功但没认出任何文字：图片问题，而非服务问题
+      return res.json({
+        code: 2,
+        data: null,
+        message: '未识别到文字：图片可能空白、模糊或过曝，请重拍清晰的图片',
+      });
     }
     const questions = splitQuestions(text);
     res.json({ code: 0, data: { rawText: text, lang, questions }, message: 'ok' });

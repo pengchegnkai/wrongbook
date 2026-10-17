@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'core/api_client.dart';
 import 'core/config.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
+import 'providers/auth_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,6 +27,12 @@ class CuotiApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
+    // token 彻底失效（401 刷新失败被拦截器清凭据）时：
+    // 同步登录态为未登录并跳登录页，否则守卫仍认为已登录、页面全部请求失败卡死
+    AuthInterceptor.onCredentialsInvalid = () {
+      ref.read(currentUserProvider.notifier).forceSignOut();
+      router.go('/login');
+    };
     return MaterialApp.router(
       title: '错题本',
       debugShowCheckedModeBanner: false,

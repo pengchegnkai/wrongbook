@@ -51,7 +51,9 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     await ref
         .read(currentUserProvider.notifier)
         .login(_username.text.trim(), _password.text, rememberMe: _rememberMe);
-    if (mounted) context.go('/');
+    // 登录失败（provider 为 AsyncError/user=null）时留在本页显示错误，不跳转
+    final user = ref.read(currentUserProvider).valueOrNull;
+    if (mounted && user != null) context.go('/');
   }
 
   @override
@@ -70,17 +72,29 @@ class _LoginPageState extends ConsumerState<LoginPage> {
               child: ListView(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
                 children: [
-                  const SizedBox(height: 32),
-                  const Icon(Icons.menu_book, size: 64),
-                  const SizedBox(height: 16),
-                  const Text('错题本',
-                      style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 48),
+                  // 品牌徽标：渐变圆角容器（现代 App hero 样式）
+                  Container(
+                    width: 84,
+                    height: 84,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(24),
+                      gradient: LinearGradient(
+                        colors: [scheme.primary, scheme.tertiary],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Icon(Icons.menu_book_rounded, size: 44, color: scheme.onPrimary),
+                  ),
+                  const SizedBox(height: 24),
+                  Text('错题本', style: Theme.of(context).textTheme.headlineMedium),
+                  const SizedBox(height: 6),
                   Text(
                     configured ? AppConfig.baseUrl : '未配置服务器地址',
-                    style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    style: TextStyle(fontSize: 13, color: scheme.onSurfaceVariant),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 36),
                   TextField(
                     controller: _username,
                     keyboardType: TextInputType.text,
@@ -88,7 +102,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     decoration: const InputDecoration(
                       labelText: '用户名',
                       prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -100,7 +113,6 @@ class _LoginPageState extends ConsumerState<LoginPage> {
                     decoration: InputDecoration(
                       labelText: '密码',
                       prefixIcon: const Icon(Icons.lock_outline),
-                      border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         icon: Icon(_obscure ? Icons.visibility_off : Icons.visibility),
                         onPressed: () => setState(() => _obscure = !_obscure),

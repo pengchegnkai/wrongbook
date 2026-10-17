@@ -13,6 +13,14 @@ const router = express.Router();
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 
+// .env 写入串行化锁：并发切换模型时排队执行，防止读-改-写互相覆盖
+let _envQueue = Promise.resolve();
+function withEnvLock(fn) {
+  const p = _envQueue.then(fn, fn);
+  _envQueue = p.catch(() => {});
+  return p;
+}
+
 // 分析错题：选模板 → 渲染 → RAG 注入 → 调 llama → 存日志
 router.post('/analyze-question', async (req, res, next) => {
   const started = Date.now();
@@ -56,15 +64,16 @@ router.post('/analyze-question', async (req, res, next) => {
 
     const result = await analyzeQuestion({ prompt: rendered, strength: effective });
 
-    // 写分析日志
+    // 写分析日志（load_time_ms/first_token_ms 尚未实现，不写假数据）
     const logR = await query(
-      `INSERT INTO question_analysis_logs (user_id, question_id, template_id, rendered_prompt, ai_response, model, mode, platform, strength, duration_ms, provider, total_tokens, load_time_ms, first_token_ms)
-       VALUES ($1,$2,$3,$4,$5,$6,'local','termux-server',$7,$8,'llama.cpp',$9,$10,$11) RETURNING id`,
+      `INSERT INTO question_analysis_logs (user_id, question_id, template_id, rendered_prompt, ai_response, model, mode, platform, strength, duration_ms, provider, total_tokens)
+       VALUES ($1,$2,$3,$4,$5,$6,'local','termux-server',$7,$8,'llama.cpp',$9) RETURNING id`,
       [req.userId, questionId, tpl.id, rendered, result.text, result.model || 'local', effective.id,
-       Date.now() - started, result.totalTokens || null, result.loadTimeMs || null, result.firstTokenMs || null]);
+       Date.now() - started, result.totalTokens || null]);
 
-    // 把 AI 生成答案写回题目（供详情页展示）
-    await query("UPDATE questions SET ai_generated_answer=$2, ai_generated_analysis=$2, updated_at=now() WHERE id=$1", [questionId, result.text]);
+    // 把 AI 生成答案写回题目（供详情页展示）；
+    // analysis 字段保持自身语义（人工/来源解析），不被 AI 文本覆盖
+    await query("UPDATE questions SET ai_generated_answer=$2, updated_at=now() WHERE id=$1", [questionId, result.text]);
 
     res.json({ code: 0, data: { logId: logR.rows[0].id, response: result.text, strength: effective.id, model: result.model }, message: 'ok' });
   } catch (e) { next(e); }
@@ -87,6 +96,15 @@ router.post('/feedback', async (req, res, next) => {
   try {
     const { questionId, analysisLogId, feedbackType, comment } = req.body || {};
     if (!feedbackType) return res.status(400).json({ code: 400, data: null, message: '缺少 feedbackType' });
+    // 归属校验：不能向他人（或不存在）的错题/分析日志写入反馈
+    if (questionId != null) {
+      const o = await query('SELECT 1 FROM questions WHERE id=$1 AND user_id=$2', [questionId, req.userId]);
+      if (!o.rows.length) return res.status(403).json({ code: 403, data: null, message: '错题不存在或不属于当前用户' });
+    }
+    if (analysisLogId != null) {
+      const o = await query('SELECT 1 FROM question_analysis_logs WHERE id=$1 AND user_id=$2', [analysisLogId, req.userId]);
+      if (!o.rows.length) return res.status(403).json({ code: 403, data: null, message: '分析记录不存在或不属于当前用户' });
+    }
     await query(
       'INSERT INTO user_feedback (user_id, question_id, analysis_log_id, feedback_type, comment) VALUES ($1,$2,$3,$4,$5)',
       [req.userId, questionId || null, analysisLogId || null, feedbackType, comment || '']);
@@ -160,17 +178,27 @@ router.post('/local-model/switch', async (req, res, next) => {
     ];
     const modelPath = candidates.find(p => fs.existsSync(p));
     if (!modelPath) return res.status(404).json({ code: 404, data: null, message: '模型文件未找到: ' + fileName });
-    // 写 server/.env（MODEL_PATH 用 ~ 相对路径，llama-server.sh 会展开）
+    // 写 server/.env（MODEL_PATH 用 ~ 相对路径，llama-server.sh 会展开）；锁内执行
     const envFile = path.join(__dirname, '../.env');
-    let env = fs.readFileSync(envFile, 'utf8');
-    const rel = modelPath.startsWith(os.homedir()) ? '~' + modelPath.slice(os.homedir().length) : modelPath;
-    env = env.replace(/^MODEL_PATH=.*/m, 'MODEL_PATH=' + rel);
-    const mname = fileName.replace(/\.gguf$/i, '').toLowerCase().replace(/\./g, '');
-    env = env.replace(/^MODEL_NAME=.*/m, 'MODEL_NAME=' + mname);
-    fs.writeFileSync(envFile, env);
-    // 异步重启 llama-server（pkg 版，参数由 llama-server.sh 统一管理）
+    const changed = await withEnvLock(() => {
+      let env = fs.readFileSync(envFile, 'utf8');
+      const rel = modelPath.startsWith(os.homedir()) ? '~' + modelPath.slice(os.homedir().length) : modelPath;
+      const before = env;
+      env = env.replace(/^MODEL_PATH=.*/m, 'MODEL_PATH=' + rel);
+      const mname = fileName.replace(/\.gguf$/i, '').toLowerCase().replace(/\./g, '');
+      env = env.replace(/^MODEL_NAME=.*/m, 'MODEL_NAME=' + mname);
+      if (env === before) return false; // replace 未生效 = .env 缺少配置行，不能假装成功
+      fs.writeFileSync(envFile, env);
+      return true;
+    });
+    if (!changed) {
+      return res.status(500).json({ code: 500, data: null, message: '.env 缺少 MODEL_PATH/MODEL_NAME 配置行，无法切换模型' });
+    }
+    // 异步重启 llama-server（pkg 版，参数由 llama-server.sh 统一管理）；
+    // bash 路径不硬编码：Termux 用 $PREFIX，其他平台退回 PATH 查找
+    const bashPath = process.env.PREFIX ? path.join(process.env.PREFIX, 'bin', 'bash') : 'bash';
     exec(`bash ~/cuoti/termux/llama-server.sh restart ${JSON.stringify(modelPath)} > ~/cuoti/logs/model-switch.log 2>&1 &`,
-      { timeout: 5000, shell: '/data/data/com.termux/files/usr/bin/bash' });
+      { shell: bashPath });
     res.json({ code: 0, data: { modelPath: rel, modelName: mname }, message: '已切换，llama-server 重启中（约数秒）' });
   } catch (e) { next(e); }
 });

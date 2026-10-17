@@ -67,7 +67,8 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
           _nickname.text.trim().isEmpty ? _username.text.trim() : _nickname.text.trim(),
           rememberMe: _rememberMe,
         );
-    if (mounted) context.go('/');
+    final user = ref.read(currentUserProvider).valueOrNull;
+    if (mounted && user != null) context.go('/');
   }
 
   @override
@@ -94,7 +95,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       labelText: '用户名 *',
                       helperText: '3-20 位：字母 / 数字 / 下划线 / 中文',
                       prefixIcon: Icon(Icons.person_outline),
-                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -104,7 +104,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     decoration: const InputDecoration(
                       labelText: '昵称（可留空，默认同用户名）',
                       prefixIcon: Icon(Icons.badge_outlined),
-                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -116,7 +115,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                       labelText: '密码 *',
                       helperText: '至少 6 位',
                       prefixIcon: Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -128,7 +126,6 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
                     decoration: const InputDecoration(
                       labelText: '确认密码 *',
                       prefixIcon: Icon(Icons.lock_outline),
-                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 8),

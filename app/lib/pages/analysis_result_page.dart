@@ -39,7 +39,7 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage> {
         // 模板选择
         templates.maybeWhen(
           data: (list) => DropdownButtonFormField<int>(
-            decoration: const InputDecoration(labelText: '提示词模板', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: '提示词模板'),
             value: _templateId,
             items: list.map((t) => DropdownMenuItem(value: t.id, child: Text(t.name))).toList(),
             onChanged: (v) => setState(() => _templateId = v),
@@ -50,7 +50,7 @@ class _AnalysisResultPageState extends ConsumerState<AnalysisResultPage> {
         // 思考强度选择
         strengths.maybeWhen(
           data: (list) => DropdownButtonFormField<String>(
-            decoration: const InputDecoration(labelText: '思考强度', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: '思考强度'),
             value: selectedStrength,
             items: list.map((s) => DropdownMenuItem(value: s.id, child: Text('${s.name}（${s.description}）'))).toList(),
             onChanged: (v) => ref.read(selectedStrengthProvider.notifier).state = v,

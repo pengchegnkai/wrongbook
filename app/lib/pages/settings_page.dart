@@ -52,7 +52,7 @@ class SettingsPage extends ConsumerWidget {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: scheme.surfaceContainerLow,
-                    borderRadius: BorderRadius.circular(12),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
                     children: [

@@ -1,6 +1,6 @@
 /// pages/review_page.dart —— 复习模式
 /// 卡片翻转（正面：原题 + 我的答案；背面：正确答案 + 解析）
-/// 左右滑动切换卡片（PageView），底部三键标记掌握度（不会/模糊/掌握）后自动下一张。
+/// 提交掌握度后该卡片从本地列表移除；全部完成显示完成态。
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -19,6 +19,14 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   final PageController _pageCtrl = PageController();
   bool _flipped = false;
   bool _submitting = false;
+  List<Question>? _local; // 本地剩余卡片：提交成功即移除（来源：provider 首次数据）
+
+  @override
+  void initState() {
+    super.initState();
+    // 每次进入本页都重新拉取今日待复习（离开期间的提交结果服务端已记录）
+    Future.microtask(() => ref.invalidate(reviewCardsProvider));
+  }
 
   @override
   void dispose() {
@@ -26,23 +34,18 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
     super.dispose();
   }
 
-  void _goNext() {
-    setState(() => _flipped = false);
-    Future.delayed(const Duration(milliseconds: 250), () {
-      if (_pageCtrl.hasClients && _pageCtrl.page!.round() < _pageCtrl.position.maxScrollExtent / MediaQuery.sizeOf(context).width) {
-        _pageCtrl.nextPage(duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
-      }
-    });
-  }
-
-  Future<void> _submit(String result) async {
-    final cards = ref.read(reviewCardsProvider).valueOrNull ?? const <Question>[];
-    final idx = _pageCtrl.page?.round() ?? 0;
-    if (idx >= cards.length || cards[idx].id == null) return;
+  Future<void> _submit(int idx, String result) async {
+    final cards = _local;
+    if (cards == null || _submitting || idx >= cards.length || cards[idx].id == null) return;
+    final qid = cards[idx].id!;
     setState(() => _submitting = true);
     try {
-      await ref.read(reviewSubmitProvider)(cards[idx].id!, result);
-      _goNext();
+      await ref.read(reviewSubmitProvider)(qid, result);
+      if (!mounted) return;
+      setState(() {
+        cards.removeAt(idx); // 本地移除，无需整页刷新
+        _flipped = false;
+      });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('提交失败：${_msg(e)}，请检查网络')));
@@ -91,11 +94,16 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                 onRetry: () => ref.invalidate(reviewCardsProvider),
               ),
               data: (cards) {
-                if (cards.isEmpty) {
+                _local ??= List<Question>.from(cards);
+                final list = _local!;
+                if (list.isEmpty) {
+                  // 复习完成（或今天本来就没有）共用完成态
                   return EmptyStateView(
                     icon: Icons.celebration,
-                    title: '今天没有待复习的错题 🎉',
-                    message: '录入新错题后，会按 1/3/7/15 天间隔提醒你复习',
+                    title: '复习完成 🎉',
+                    message: cards.isEmpty
+                        ? '今天没有待复习的错题。录入新错题后，会按 1/3/7/15 天间隔提醒你复习'
+                        : '本轮错题已全部复习完毕，明天继续加油',
                     actionLabel: '去录入错题',
                     onAction: () => context.push('/scan'),
                   );
@@ -107,7 +115,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                       child: Row(
                         children: [
                           Text(
-                            '第 ${(_pageCtrl.page?.round() ?? 0) + 1} / ${cards.length} 张',
+                            '第 ${(_pageCtrl.page?.round() ?? 0).clamp(0, list.length - 1) + 1} / ${list.length} 张',
                             style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                           const Spacer(),
@@ -122,10 +130,10 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                     Expanded(
                       child: PageView.builder(
                         controller: _pageCtrl,
-                        itemCount: cards.length,
+                        itemCount: list.length,
                         onPageChanged: (i) => setState(() => _flipped = false),
                         itemBuilder: (context, i) => _ReviewCard(
-                          question: cards[i],
+                          question: list[i],
                           flipped: _flipped,
                           onFlip: () => setState(() => _flipped = !_flipped),
                         ),
@@ -146,7 +154,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 4),
                                   child: FilledButton(
-                                    onPressed: _submitting ? null : () => _submit(b.$1),
+                                    onPressed: _submitting ? null : () => _submit(_pageCtrl.page?.round() ?? 0, b.$1),
                                     style: FilledButton.styleFrom(
                                       backgroundColor: b.$3,
                                       minimumSize: const Size.fromHeight(48),
@@ -178,7 +186,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
 }
 
 class _ReviewCard extends StatelessWidget {
-  _ReviewCard({required this.question, required this.flipped, required this.onFlip});
+  const _ReviewCard({required this.question, required this.flipped, required this.onFlip});
   final Question question;
   final bool flipped;
   final VoidCallback onFlip;

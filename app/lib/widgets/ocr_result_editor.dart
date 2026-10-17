@@ -26,7 +26,6 @@ class OcrResultEditor extends StatelessWidget {
         maxLines: 6,
         decoration: const InputDecoration(
           labelText: '识别文本（可编辑）',
-          border: OutlineInputBorder(),
           alignLabelWithHint: true,
         ),
         onChanged: onChanged,

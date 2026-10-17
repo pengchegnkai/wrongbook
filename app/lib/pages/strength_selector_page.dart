@@ -65,16 +65,16 @@ class _ConfigFormState extends ConsumerState<_ConfigForm> {
   Widget build(BuildContext context) {
     return Column(children: [
       DropdownButtonFormField<String>(
-        decoration: const InputDecoration(labelText: '默认强度', border: OutlineInputBorder()),
+        decoration: const InputDecoration(labelText: '默认强度'),
         value: _strength,
         items: widget.strengths.map((s) => DropdownMenuItem(value: s.id as String, child: Text(s.name as String))).toList(),
         onChanged: (v) => setState(() => _strength = v),
       ),
       const SizedBox(height: 8),
-      TextField(decoration: const InputDecoration(labelText: '学科（可空）', border: OutlineInputBorder()),
+      TextField(decoration: const InputDecoration(labelText: '学科（可空）'),
         onChanged: (v) => _subject = v.isEmpty ? null : v),
       const SizedBox(height: 8),
-      TextField(decoration: const InputDecoration(labelText: '题型（可空）', border: OutlineInputBorder()),
+      TextField(decoration: const InputDecoration(labelText: '题型（可空）'),
         onChanged: (v) => _questionType = v.isEmpty ? null : v),
       const SizedBox(height: 8),
       FilledButton(onPressed: _strength == null ? null : () async {

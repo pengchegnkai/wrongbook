@@ -15,13 +15,16 @@ class OcrState {
 
 class OcrNotifier extends StateNotifier<OcrState> {
   final OcrApiService _service = OcrApiService();
+  int _seq = 0; // 自增序号：只有最新一次 recognize 允许写状态
   OcrNotifier() : super(const OcrState());
 
-  /// 上传识别。重复调用会覆盖旧状态。
+  /// 上传识别。重复调用会使旧请求结果作废（防旧响应覆盖新状态）。
   Future<void> recognize(String imagePath) async {
+    final seq = ++_seq;
     state = OcrState(stage: OcrStage.uploading, imagePath: imagePath);
     try {
       final result = await _service.recognize(imagePath);
+      if (seq != _seq) return; // 已有更新的请求，丢弃本次结果
       if (result.rawText.isEmpty) {
         state = OcrState(
           stage: OcrStage.error,
@@ -32,6 +35,7 @@ class OcrNotifier extends StateNotifier<OcrState> {
       }
       state = OcrState(stage: OcrStage.done, result: result, imagePath: imagePath);
     } catch (e) {
+      if (seq != _seq) return;
       state = OcrState(stage: OcrStage.error, imagePath: imagePath, error: friendlyOcrError(e));
     }
   }
@@ -43,7 +47,10 @@ class OcrNotifier extends StateNotifier<OcrState> {
     await recognize(path);
   }
 
-  void reset() => state = const OcrState();
+  void reset() {
+    _seq++; // 作废在途请求
+    state = const OcrState();
+  }
 }
 
 final ocrProvider = StateNotifierProvider<OcrNotifier, OcrState>((ref) => OcrNotifier());

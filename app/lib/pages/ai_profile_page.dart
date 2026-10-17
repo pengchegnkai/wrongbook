@@ -45,10 +45,10 @@ class _AiProfilePageState extends ConsumerState<AiProfilePage> {
           ))),
           const SizedBox(height: 16),
           TextField(controller: _goal..text = p?.learningGoal ?? '',
-            maxLines: 3, decoration: const InputDecoration(labelText: '学习目标（会影响 AI 分析口吻）', border: OutlineInputBorder())),
+            maxLines: 3, decoration: const InputDecoration(labelText: '学习目标（会影响 AI 分析口吻）')),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
-            decoration: const InputDecoration(labelText: '解释风格', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: '解释风格'),
             value: p?.preferredExplanationStyle,
             items: const [
               DropdownMenuItem(value: 'step_by_step', child: Text('分步讲解')),

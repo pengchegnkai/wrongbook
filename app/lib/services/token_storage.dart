@@ -40,8 +40,10 @@ class TokenStorage {
     if (userId != null) _userIdCache = userId;
     if (username != null) _usernameCache = username;
     if (rememberMe != null) _rememberCache = rememberMe;
-    await _storage.write(key: _kAccess, value: access);
+    // 先写 refresh 再写 access：两写之间进程被杀时，宁可留旧 access（401 可刷新）
+    // 也不能留已被服务端轮换吊销的旧 refresh（必导致刷新失败被登出）
     await _storage.write(key: _kRefresh, value: refresh);
+    await _storage.write(key: _kAccess, value: access);
     if (userId != null) await _storage.write(key: _kUserId, value: userId.toString());
     if (username != null) await _storage.write(key: _kUsername, value: username);
     if (rememberMe != null) await _storage.write(key: _kRemember, value: rememberMe ? 'true' : 'false');

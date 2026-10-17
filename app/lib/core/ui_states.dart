@@ -90,7 +90,7 @@ class _SkeletonCardState extends State<_SkeletonCard> with SingleTickerProviderS
       opacity: Tween<double>(begin: 0.35, end: 1.0).animate(_ctrl),
       child: Container(
         padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(color: grey, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(color: grey, borderRadius: BorderRadius.circular(16)),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: const [

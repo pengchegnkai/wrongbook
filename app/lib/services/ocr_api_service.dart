@@ -34,7 +34,7 @@ class OcrApiService {
     final form = FormData.fromMap({
       'image': await MultipartFile.fromFile(
         imagePath,
-        filename: 'ocr_$DateTime.now().microsecondsSinceEpoch.${ext == 'jpeg' ? 'jpg' : ext}',
+        filename: 'ocr_${DateTime.now().microsecondsSinceEpoch}.${ext == 'jpeg' ? 'jpg' : ext}',
       ),
     });
     final r = await api.dio.post('/ocr/recognize', data: form);
@@ -57,7 +57,7 @@ class OcrApiService {
 String friendlyOcrError(Object e) {
   if (e is Exception && e.toString().startsWith('Exception:')) {
     final msg = e.toString().substring(10);
-    if (msg.contains('OCR 服务不可用')) return msg;
+    if (msg.contains('OCR 服务不可用') || msg.contains('未识别到文字')) return msg;
     if (msg.contains('未配置')) return msg;
   }
   final s = e.toString();

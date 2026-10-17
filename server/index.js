@@ -2,9 +2,14 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const fs = require('fs');
 const { ensureSchema } = require('./db');
+const { assertSecretConfigured } = require('./services/tokenService');
 const corsMiddleware = require('./middleware/cors');
 const authMiddleware = require('./middleware/auth');
+
+// JWT_SECRET 未设置/占位/过弱直接退出，绝不静默用可猜密钥签发 token
+assertSecretConfigured();
 
 const app = express();
 const HOST = process.env.HOST || '0.0.0.0';
@@ -55,6 +60,10 @@ app.use('/api/ocr', auth, require('./routes/ocr'));
 
 // 统一错误处理：不抛原始堆栈
 app.use((err, req, res, next) => {
+  // multer（diskStorage）在 fileFilter/大小限制失败时已落盘但不会进 handler 的 finally，这里兜底清理
+  if (req.file && req.file.path && req.file.path.includes(`${path.sep}tmp`)) {
+    fs.unlink(req.file.path, () => {});
+  }
   console.error('[error]', err.message);
   res.status(err.status || 500).json({ code: err.status || 500, data: null, message: '服务器内部错误' });
 });

@@ -127,7 +127,6 @@ class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
                   data: (list) => DropdownButtonFormField<int?>(
                     value: _selectedTemplateId,
                     decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
                       isDense: true,
                       contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
@@ -183,7 +182,7 @@ class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
                   decoration: const InputDecoration(
                     labelText: '补充说明（可选）',
                     hintText: '例如：重点讲一下第二种解法',
-                    border: OutlineInputBorder(),
+
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -236,7 +235,7 @@ class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: scheme.surfaceContainerLow,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(16),
                     ),
                     child: MarkdownBody(
                       data: analysis.response!,
@@ -322,7 +321,7 @@ class _QuestionPickerState extends ConsumerState<_QuestionPicker> {
     return DropdownButtonFormField<int?>(
       value: widget.selected,
       decoration: const InputDecoration(
-        border: OutlineInputBorder(),
+
         isDense: true,
         contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       ),

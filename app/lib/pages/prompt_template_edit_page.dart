@@ -36,10 +36,10 @@ class _PromptTemplateEditPageState extends ConsumerState<PromptTemplateEditPage>
     return Scaffold(
       appBar: AppBar(title: Text(widget.template == null ? '新建模板' : '编辑模板')),
       body: ListView(padding: const EdgeInsets.all(16), children: [
-        TextField(controller: _name, decoration: const InputDecoration(labelText: '模板名称', border: OutlineInputBorder())),
+        TextField(controller: _name, decoration: const InputDecoration(labelText: '模板名称')),
         const SizedBox(height: 12),
         TextField(controller: _content, maxLines: 10, decoration: const InputDecoration(
-          labelText: '模板内容', border: OutlineInputBorder(), alignLabelWithHint: true)),
+          labelText: '模板内容', alignLabelWithHint: true)),
         const SizedBox(height: 8),
         const Text('可用变量：', style: TextStyle(fontSize: 12, color: Colors.grey)),
         Wrap(children: [
@@ -47,7 +47,7 @@ class _PromptTemplateEditPageState extends ConsumerState<PromptTemplateEditPage>
             Padding(padding: const EdgeInsets.all(2), child: Chip(label: Text(v, style: const TextStyle(fontSize: 10)))),
         ]),
         const SizedBox(height: 12),
-        TextField(decoration: const InputDecoration(labelText: '适用学科（可空=通用）', border: OutlineInputBorder()),
+        TextField(decoration: const InputDecoration(labelText: '适用学科（可空=通用）'),
           onChanged: (v) => _subject = v.isEmpty ? null : v, controller: TextEditingController(text: _subject ?? '')),
         SwitchListTile(title: const Text('设为默认模板'), value: _isDefault, onChanged: (v) => setState(() => _isDefault = v)),
         const SizedBox(height: 8),

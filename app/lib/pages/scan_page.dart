@@ -79,7 +79,7 @@ class _ScanPageState extends ConsumerState<ScanPage> {
                         padding: const EdgeInsets.all(16),
                         children: [
                           ClipRRect(
-                            borderRadius: BorderRadius.circular(12),
+                            borderRadius: BorderRadius.circular(16),
                             child: Image.file(_image!, fit: BoxFit.contain),
                           ),
                           if (_error != null) ...[

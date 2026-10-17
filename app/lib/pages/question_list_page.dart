@@ -159,7 +159,6 @@ class _QuestionListPageState extends ConsumerState<QuestionListPage> {
                       hintText: '搜索',
                       isDense: true,
                       prefixIcon: const Icon(Icons.search, size: 18),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                     ),
                   ),
                 ),
@@ -244,7 +243,7 @@ class _QuestionCard extends StatelessWidget {
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: scheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           border: Border(left: BorderSide(color: _masteryColor, width: 4)),
         ),
         child: Column(

@@ -42,6 +42,16 @@ start() {
   echo "模型: $MODEL_PATH"
   echo "接口: http://0.0.0.0:$PORT/v1/chat/completions（OpenAI 兼容，已验证可用）"
   echo "日志: $LOG_DIR/llama-server.log"
+  # 等待模型加载完成（最多 60s）：health 返回 ok 才算就绪，
+  # 否则 start-all.sh 刚起 2 秒就检查会误报「无响应」
+  for _ in $(seq 1 30); do
+    if curl -s -m 2 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q ok; then
+      echo "就绪：模型加载完成"
+      return
+    fi
+    sleep 2
+  done
+  echo "警告：60 秒内未就绪，请查看 $LOG_DIR/llama-server.log（首次加载大模型可能更慢）"
 }
 
 stop() {

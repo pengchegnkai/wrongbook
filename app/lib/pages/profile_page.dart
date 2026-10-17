@@ -29,9 +29,9 @@ class _ProfilePageState extends ConsumerState<ProfilePage> {
         const Divider(height: 32),
         const Text('修改密码（修改后其他设备将全部下线）'),
         const SizedBox(height: 8),
-        TextField(controller: _old, obscureText: true, decoration: const InputDecoration(labelText: '旧密码', border: OutlineInputBorder())),
+        TextField(controller: _old, obscureText: true, decoration: const InputDecoration(labelText: '旧密码')),
         const SizedBox(height: 12),
-        TextField(controller: _new, obscureText: true, decoration: const InputDecoration(labelText: '新密码（至少 6 位）', border: OutlineInputBorder())),
+        TextField(controller: _new, obscureText: true, decoration: const InputDecoration(labelText: '新密码（至少 6 位）')),
         const SizedBox(height: 12),
         if (_msg != null) Text(_msg!, style: const TextStyle(color: Colors.red, fontSize: 12)),
         FilledButton(onPressed: () async {

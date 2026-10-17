@@ -13,6 +13,11 @@ if pg_isready -q 2>/dev/null; then
 else
   env -u LD_PRELOAD pg_ctl -D "$PGDATA" -l "$LOG_DIR/postgres.log" start \
     || echo "错误：PostgreSQL 启动失败，请查看 $LOG_DIR/postgres.log"
+  # 等待就绪（最多 15s）：Node 后端起早了会因连不上库反复崩溃重启（pm2 ↺ 飙升）
+  for _ in $(seq 1 15); do
+    pg_isready -q 2>/dev/null && break
+    sleep 1
+  done
   sleep 2
 fi
 pg_isready || echo "警告：PostgreSQL 未就绪"
