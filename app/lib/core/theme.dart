@@ -2,6 +2,7 @@
 /// 设计语言：Material 3 + 大圆角 + 无阴影分层（用表面色阶代替 elevation）+
 /// 填充式输入框 + 浮动 SnackBar。所有组件样式在主题层统一，页面不写死样式。
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 // 品牌色：靛蓝（比默认蓝更沉稳，深浅色模式下对比度均达标）
 const _seedLight = Color(0xFF4F6BED);
@@ -75,11 +76,6 @@ ThemeData _baseTheme(Color seed, Brightness brightness) {
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
       ),
     ),
-    iconButtonTheme: IconButtonThemeData(
-      style: IconButton.styleFrom(
-        highlightElevation: 0,
-      ),
-    ),
     // ---- 输入框：填充式（现代表单标配），聚焦描边 2px ----
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
@@ -142,7 +138,7 @@ ThemeData _baseTheme(Color seed, Brightness brightness) {
       linearTrackColor: scheme.surfaceContainerHighest,
       circularTrackColor: scheme.surfaceContainerHighest,
     ),
-    // ---- 页面切换：Android 用共享轴式淡入前进（M3 官方推荐样式） ----
+    // ---- 页面切换：Android 用 M3 缩放转场，iOS 用 Cupertino 滑动转场 ----
     pageTransitionsTheme: const PageTransitionsTheme(
       builders: {
         TargetPlatform.android: ZoomPageTransitionsBuilder(),

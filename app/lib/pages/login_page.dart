@@ -58,6 +58,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     final auth = ref.watch(currentUserProvider);
     final errorText = auth is AsyncError ? _extractErrorMessage(auth.error) : null;
     final loading = auth.isLoading;
