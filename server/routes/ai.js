@@ -26,7 +26,7 @@ router.post('/analyze-question', async (req, res, next) => {
   const started = Date.now();
   try {
     const { questionId, templateId, strength, extra } = req.body || {};
-    if (!questionId) return res.status(400).json({ code: 400, data: null, message: '缺少 questionId' });
+    if (!questionId) return res.status(400).json({ code: 400, data: null, message: '缺少 questionId：请先选择要分析的错题' });
     const qr = await query('SELECT * FROM questions WHERE id=$1 AND user_id=$2', [questionId, req.userId]);
     if (!qr.rows.length) return res.status(404).json({ code: 404, data: null, message: '错题不存在' });
     const q = qr.rows[0];

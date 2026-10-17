@@ -29,29 +29,63 @@ class ApiClient {
     dio.options.baseUrl = AppConfig.apiBase;
   }
 
+  /// 把 DioException 转成带后端具体 message 的异常。
+  /// 后端统一返回 { code, data, message }，4xx/5xx 的 message 是
+  /// 人话（如"缺少 questionId""没有可用模板，请先创建"），
+  /// 不解包的话 UI 只能看到"DioException [bad response]: 400"。
+  static Exception friendly(DioException e) {
+    final status = e.response?.statusCode;
+    final data = e.response?.data;
+    String? msg;
+    if (data is Map) {
+      msg = data['message']?.toString();
+      if (msg != null && msg.isEmpty) msg = null;
+    } else if (data is String && data.isNotEmpty && data.length < 300) {
+      msg = data; // 非 JSON 错误页（截断显示）
+    }
+    if (msg != null) return Exception('[$status] $msg');
+    return Exception('[$status] ${e.type.name}: ${e.message ?? '请求失败'}');
+  }
+
   /// 统一响应解包 { code, data, message }
   Future<dynamic> get(String path, {Map<String, dynamic>? query}) async {
     ensureConfigured();
-    final r = await dio.get(path, queryParameters: query);
-    return r.data['data'];
+    try {
+      final r = await dio.get(path, queryParameters: query);
+      return r.data['data'];
+    } on DioException catch (e) {
+      throw friendly(e);
+    }
   }
 
   Future<dynamic> post(String path, {Object? body}) async {
     ensureConfigured();
-    final r = await dio.post(path, data: body);
-    return r.data['data'];
+    try {
+      final r = await dio.post(path, data: body);
+      return r.data['data'];
+    } on DioException catch (e) {
+      throw friendly(e);
+    }
   }
 
   Future<dynamic> put(String path, {Object? body}) async {
     ensureConfigured();
-    final r = await dio.put(path, data: body);
-    return r.data['data'];
+    try {
+      final r = await dio.put(path, data: body);
+      return r.data['data'];
+    } on DioException catch (e) {
+      throw friendly(e);
+    }
   }
 
   Future<dynamic> delete(String path) async {
     ensureConfigured();
-    final r = await dio.delete(path);
-    return r.data['data'];
+    try {
+      final r = await dio.delete(path);
+      return r.data['data'];
+    } on DioException catch (e) {
+      throw friendly(e);
+    }
   }
 }
 

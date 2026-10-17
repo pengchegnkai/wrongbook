@@ -27,7 +27,16 @@ async function chat({ prompt, strength, systemPrompt }) {
       body: JSON.stringify(body),
       signal: AbortSignal.timeout(300000)
     });
-    if (!r.ok) throw new Error(`llama-server 返回 ${r.status}`);
+    if (!r.ok) {
+      // llama-server 的 4xx/5xx 响应体带具体原因（如 prompt 超长、参数错误），
+      // 记日志并透传给上层，避免只报一个状态码无法定位
+      let detail = '';
+      try {
+        detail = (await r.text()).slice(0, 500);
+      } catch (_) { /* 读不到响应体就只报状态码 */ }
+      console.error(`[llamaClient] /v1/chat/completions 返回 ${r.status}: ${detail}`);
+      throw new Error(`llama-server 返回 ${r.status}${detail ? '：' + detail : ''}`);
+    }
     const data = await r.json();
     const choice = data.choices?.[0]?.message || {};
     // 推理模型（如 MiniCPM5）把思考放在 reasoning_content，最终答案在 content
