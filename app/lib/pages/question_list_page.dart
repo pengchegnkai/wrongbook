@@ -103,7 +103,10 @@ class _QuestionListPageState extends ConsumerState<QuestionListPage> {
                       );
                     }
                     final q = list.items[i];
-                    return _QuestionCard(q: q, onTap: () => context.push('/questions/detail/${q.id}'));
+                    return Hero(
+                      tag: 'question-${q.id}',
+                      child: _QuestionCard(q: q, onTap: () => context.push('/questions/detail/${q.id}')),
+                    );
                   },
                 ),
       );

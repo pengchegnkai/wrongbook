@@ -80,7 +80,8 @@ class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
     }
     ref.read(analysisProvider.notifier).reset();
     _startTicker();
-    await ref.read(analysisProvider.notifier).analyze(
+    // 流式打字机输出（服务端 SSE 逐 token 转发）
+    await ref.read(analysisProvider.notifier).analyzeStream(
           questionId: qid,
           templateId: _selectedTemplateId,
           strength: _selectedStrength,
@@ -206,18 +207,19 @@ class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
                       style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                     ),
                   ),
-                // 错误
-                if (analysis.error != null)
+                // 错误（无内容时）
+                if (analysis.error != null && (analysis.response == null || analysis.response!.isEmpty))
                   Padding(
                     padding: const EdgeInsets.only(top: 16),
                     child: ErrorRetryView(message: analysis.error!, onRetry: _analyze),
                   ),
-                // 结果
+                // 流式打字机：进行中用纯文本（避免逐 token 重排 Markdown 卡顿 845）
                 if (analysis.response != null) ...[
                   const SizedBox(height: 20),
                   Row(
                     children: [
-                      Text('分析结果', style: Theme.of(context).textTheme.titleSmall),
+                      Text(analysis.streaming ? '分析中（实时输出）' : '分析结果',
+                          style: Theme.of(context).textTheme.titleSmall),
                       if (analysis.strength != null)
                         Padding(
                           padding: const EdgeInsets.only(left: 8),
@@ -225,27 +227,44 @@ class _AiAnalysisPageState extends ConsumerState<AiAnalysisPage> {
                               style: TextStyle(fontSize: 11, color: scheme.onSurfaceVariant)),
                         ),
                       const Spacer(),
-                      TextButton.icon(
-                        onPressed: _analyze,
-                        icon: const Icon(Icons.refresh, size: 16),
-                        label: const Text('再分析一次'),
-                      ),
+                      if (!analysis.running)
+                        TextButton.icon(
+                          onPressed: _analyze,
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('再分析一次'),
+                        ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   Container(
+                    width: double.infinity,
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
                       color: scheme.surfaceContainerLow,
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    child: MarkdownBody(
-                      data: analysis.response!,
-                      styleSheet: MarkdownStyleSheet(
-                        p: TextStyle(fontSize: 14, height: 1.6, color: scheme.onSurface),
-                      ),
-                    ),
+                    child: analysis.streaming
+                        ? Text(
+                            '${analysis.response}▌', // 光标
+                            style: TextStyle(fontSize: 14, height: 1.6, color: scheme.onSurface),
+                          )
+                        : MarkdownBody(
+                            data: analysis.response!,
+                            styleSheet: MarkdownStyleSheet(
+                              p: TextStyle(fontSize: 14, height: 1.6, color: scheme.onSurface),
+                            ),
+                          ),
                   ),
+                  // 部分结果 + 连接中断提示
+                  if (analysis.error != null && !analysis.running)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(children: [
+                        Icon(Icons.warning_amber_rounded, size: 14, color: scheme.error),
+                        const SizedBox(width: 4),
+                        Expanded(child: Text(analysis.error!, style: TextStyle(fontSize: 11, color: scheme.error))),
+                      ]),
+                    ),
                 ],
               ],
             ),

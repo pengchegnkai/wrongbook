@@ -1,11 +1,15 @@
 /// pages/home_page.dart —— 首页仪表盘
 /// 内容：总错题 / 学科数 / 掌握度分布 / 今日待复习 / 已核验·待核验 / 快捷入口
 /// 布局：手机竖屏单列；平板或横屏（宽度 ≥ 900）左右分栏（左侧导航 + 右侧内容）
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:skeletonizer/skeletonizer.dart';
 import '../core/ui_states.dart';
 import '../providers/stats_provider.dart';
+import '../widgets/modern_card.dart';
 
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -90,8 +94,12 @@ class _HomeContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final stats = ref.watch(overviewStatsProvider);
+    final weekly = ref.watch(weeklyStatsProvider);
     return stats.when(
-      loading: () => const PageSkeleton(itemCount: 4),
+      loading: () => const Skeletonizer(
+        enabled: true,
+        child: _FakeHomeContent(),
+      ),
       error: (e, _) => ErrorRetryView(
         message: e.toString().startsWith('Exception:') ? e.toString().substring(10) : e.toString(),
         onRetry: () => ref.invalidate(overviewStatsProvider),
@@ -106,22 +114,178 @@ class _HomeContent extends ConsumerWidget {
             onAction: () => context.push('/scan'),
           );
         }
-        return RefreshIndicator(
-          onRefresh: () async => ref.invalidate(overviewStatsProvider),
-          child: ListView(
-          padding: const EdgeInsets.all(16),
+        return ListView(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 96), // 底部让出毛玻璃导航栏
           children: [
             _OverviewCards(s: s),
             const SizedBox(height: 16),
             _MasteryRow(s: s),
             const SizedBox(height: 16),
+            _WeeklyTrendCard(weekly: weekly),
+            const SizedBox(height: 16),
             Text('快捷入口', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             _EntryGrid(),
           ],
-        ),
         );
       },
+    );
+  }
+}
+
+/// 骨架屏假内容（与真实布局同构，skeletonizer 起来不跳变）
+class _FakeHomeContent extends StatelessWidget {
+  const _FakeHomeContent();
+
+  @override
+  Widget build(BuildContext context) {
+    Widget fakeTile() => Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(Icons.abc, size: 20),
+              const SizedBox(height: 8),
+              Text('888', style: Theme.of(context).textTheme.titleLarge),
+              const Text('占位占位'),
+            ],
+          ),
+        );
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 96),
+      children: [
+        Row(children: [
+          for (var i = 0; i < 4; i++)
+            Expanded(child: Padding(padding: const EdgeInsets.only(right: 8), child: fakeTile())),
+        ]),
+        const SizedBox(height: 16),
+        Container(
+          height: 120,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          height: 180,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 最近 7 天录入趋势（平滑曲线；数字用等宽字体）
+class _WeeklyTrendCard extends ConsumerWidget {
+  const _WeeklyTrendCard({required this.weekly});
+  final AsyncValue<List<dynamic>> weekly;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final scheme = Theme.of(context).colorScheme;
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('最近 7 天录入趋势', style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 160,
+            child: weekly.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, _) => Center(
+                child: TextButton(
+                  onPressed: () => ref.invalidate(weeklyStatsProvider),
+                  child: const Text('加载失败，点此重试', style: TextStyle(fontSize: 12, color: Colors.red)),
+                ),
+              ),
+              data: (rows) {
+                if (rows.isEmpty) return const Center(child: Text('暂无数据', style: TextStyle(fontSize: 12)));
+                return LineChart(LineChartData(
+                  minY: 0,
+                  gridData: FlGridData(
+                    show: true,
+                    drawVerticalLine: false,
+                    horizontalInterval: 1,
+                    getDrawingHorizontalLine: (v) => FlLine(
+                      color: scheme.outlineVariant.withValues(alpha: 0.4),
+                      strokeWidth: 1,
+                    ),
+                  ),
+                  titlesData: FlTitlesData(
+                    topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                    bottomTitles: AxisTitles(sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 24,
+                      getTitlesWidget: (v, _) => Padding(
+                        padding: const EdgeInsets.only(top: 6),
+                        child: Text(
+                          (rows[v.toInt().clamp(0, rows.length - 1)]['day'] ?? '') as String,
+                          style: TextStyle(fontSize: 10, color: scheme.onSurfaceVariant),
+                        ),
+                      ),
+                    )),
+                  ),
+                  borderData: FlBorderData(show: false),
+                  lineBarsData: [
+                    LineChartBarData(
+                      spots: [
+                        for (var i = 0; i < rows.length; i++)
+                          FlSpot(i.toDouble(), (rows[i]['n'] as num?)?.toDouble() ?? 0),
+                      ],
+                      isCurved: true,                       // 平滑曲线
+                      curveSmoothness: 0.35,                // 845 上适度平滑，不过度采样
+                      preventCurveOverShooting: true,
+                      barWidth: 3,
+                      isStrokeCapRound: true,
+                      dotData: const FlDotData(show: false),
+                      belowBarData: BarAreaData(
+                        show: true,
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            scheme.primary.withValues(alpha: 0.25),
+                            scheme.primary.withValues(alpha: 0.02),
+                          ],
+                        ),
+                      ),
+                      gradient: LinearGradient(
+                        colors: [scheme.primary, scheme.tertiary],
+                      ),
+                    ),
+                  ],
+                  lineTouchData: LineTouchData(
+                    touchTooltipData: LineTouchTooltipData(
+                      getTooltipItems: (spots) => [
+                        for (final s in spots)
+                          LineTooltipItem(
+                            '${s.y.toInt()}',
+                            GoogleFonts.robotoMono(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: scheme.onPrimary,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                ));
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -172,7 +336,8 @@ class _StatTile extends StatelessWidget {
         children: [
           Icon(icon, size: 20, color: color),
           const SizedBox(height: 8),
-          Text(value, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color)),
+          Text(value, style: GoogleFonts.robotoMono(
+            fontSize: 22, fontWeight: FontWeight.bold, color: color)),
           const SizedBox(height: 2),
           Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ],

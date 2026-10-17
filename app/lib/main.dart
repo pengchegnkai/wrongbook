@@ -1,3 +1,4 @@
+import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -42,13 +43,20 @@ class CuotiApp extends ConsumerWidget {
         ref.read(localRecordProvider.notifier).syncNow().catchError((_) => 0);
       }
     });
-    return MaterialApp.router(
-      title: '错题本',
-      debugShowCheckedModeBanner: false,
-      theme: buildLightTheme(),
-      darkTheme: buildDarkTheme(),
-      themeMode: themeMode,
-      routerConfig: router,
+    return DynamicColorBuilder(
+      builder: (lightDynamic, darkDynamic) {
+        // Android 12+ 从壁纸取色；低版本/取色失败回退品牌靛蓝主题
+        final light = buildThemeFromScheme(lightDynamic, Brightness.light)!;
+        final dark = buildThemeFromScheme(darkDynamic, Brightness.dark)!;
+        return MaterialApp.router(
+          title: '错题本',
+          debugShowCheckedModeBanner: false,
+          theme: light,
+          darkTheme: dark,
+          themeMode: themeMode,
+          routerConfig: router,
+        );
+      },
     );
   }
 }

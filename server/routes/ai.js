@@ -256,4 +256,186 @@ router.post('/local-model/switch', async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+// 流式分析：SSE 逐 token 转发（llama-server stream:true）。
+// 事件流格式：
+//   data: {"delta":"..."}           增量文本（content 与 reasoning_content 已合并）
+//   data: {"done":true,"logId":N,...} 结束（含持久化结果）
+//   data: [DONE]
+// 流式响应持续有字节流动，不触发 Cloudflare 免费版 ~100s 源站超时（与轮询方案互补）。
+router.post('/analyze-question-stream', async (req, res, next) => {
+  const started = Date.now();
+  const t = (label) => console.log(`[stream] +${Date.now() - started}ms ${label}`);
+  t('enter');
+  const abort = new AbortController();
+  // 注意：Node 16+ 里 req 的 'close' 在请求体读完时就会触发（不是连接断开），
+  // 会导致 fetch 还没发出就"已中止"→ 客户端永远收不到响应。
+  // 客户端断开的正确信号是响应流的 'close' 且尚未正常结束。
+  res.on('close', () => {
+    if (!res.writableEnded) abort.abort();
+  });
+  try {
+    const { questionId, templateId, strength, extra } = req.body || {};
+    if (!questionId) return res.status(400).json({ code: 400, data: null, message: '缺少 questionId：请先选择要分析的错题' });
+    const qr = await query('SELECT * FROM questions WHERE id=$1 AND user_id=$2', [questionId, req.userId]);
+    t('question loaded');
+    if (!qr.rows.length) return res.status(404).json({ code: 404, data: null, message: '错题不存在' });
+    const q = qr.rows[0];
+
+    let tpl = null;
+    if (templateId) {
+      const tr = await query('SELECT * FROM prompt_templates WHERE id=$1 AND user_id=$2', [templateId, req.userId]);
+      tpl = tr.rows[0] || null;
+    }
+    if (!tpl) {
+      const tr = await query('SELECT * FROM prompt_templates WHERE user_id=$1 AND is_default=true LIMIT 1', [req.userId]);
+      tpl = tr.rows[0] || null;
+    }
+    if (!tpl) return res.status(400).json({ code: 400, data: null, message: '没有可用模板，请先创建' });
+
+    let effective = strength ? resolveStrength(strength) : null;
+    if (!effective) {
+      const cr = await query('SELECT default_strength FROM analysis_strength_configs WHERE user_id=$1 AND subject IS NOT DISTINCT FROM $2 LIMIT 1',
+        [req.userId, q.subject_id || null]);
+      effective = resolveStrength(cr.rows[0] ? cr.rows[0].default_strength : null);
+    }
+
+    const rag = await retrieveContext(req.userId, q.original_question);
+    t('rag done');
+    const rendered = renderTemplate(tpl.template_content, {
+      subject: q.subject_id, chapter: q.chapter_id, knowledgePoints: rag.kpNames.join('、'),
+      originalQuestion: q.original_question, myAnswer: q.my_answer || '', correctAnswer: q.correct_answer || '',
+      analysis: q.analysis || '', errorType: q.error_type || '', mastery: q.mastery || '',
+      questionType: q.question_type || '', courseType: '普通高中', extra: extra || ''
+    }) + '\n\n【历史相似错题参考】\n' + rag.similarQuestions.join('\n') + '\n\n【用户偏好记忆】\n' + rag.memories.join('\n')
+      + '\n\n【输出格式要求】\n' + getBaseInstructions();
+
+    // 建立与客户端的 SSE
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream; charset=utf-8',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+      'X-Accel-Buffering': 'no',
+    });
+    const sseSend = (obj) => res.write(`data: ${JSON.stringify(obj)}\n\n`);
+
+    // 调 llama-server（流式），逐 token 转发
+    const LLAMA_BASE = () => process.env.LLAMA_BASE_URL || 'http://127.0.0.1:8080';
+    const MODEL_NAME = () => process.env.MODEL_NAME || 'local';
+    const up = await fetch(`${LLAMA_BASE()}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL_NAME(),
+        messages: [{ role: 'user', content: rendered }],
+        max_tokens: effective.maxTokens,
+        temperature: 0.7,
+        stream: true,
+      }),
+      signal: abort.signal,
+    });
+    if (!up.ok || !up.body) {
+      let detail = '';
+      try { detail = (await up.text()).slice(0, 300); } catch (_) {}
+      sseSend({ error: `llama-server 返回 ${up.status}${detail ? '：' + detail : ''}` });
+      res.write('data: [DONE]\n\n');
+      return res.end();
+    }
+
+    // 解析上游 SSE，合并 reasoning_content + content 增量转发
+    const decoder = new TextDecoder();
+    let buf = '';
+    let full = '';
+    let model = 'local';
+    let totalTokens = null;
+    for await (const chunk of up.body) {
+      buf += decoder.decode(chunk, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith('data:')) continue;
+        const payload = t.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const j = JSON.parse(payload);
+          const d = j.choices?.[0]?.delta || {};
+          const piece = (d.content || '') + (d.reasoning_content || '');
+          if (piece) { full += piece; sseSend({ delta: piece }); }
+          if (j.model) model = j.model;
+          if (j.usage?.total_tokens) totalTokens = j.usage.total_tokens;
+        } catch (_) { /* 不完整 JSON 行忽略 */ }
+      }
+    }
+
+    // 持久化（与同步路径一致：写日志 + 回写题目 AI 答案）
+    let logId = null;
+    try {
+      const logR = await query(
+        `INSERT INTO question_analysis_logs (user_id, question_id, template_id, rendered_prompt, ai_response, model, mode, platform, strength, duration_ms, provider, total_tokens)
+         VALUES ($1,$2,$3,$4,$5,$6,'local','termux-server',$7,$8,'llama.cpp',$9) RETURNING id`,
+        [req.userId, questionId, tpl.id, rendered, full, model, effective.id, Date.now() - started, totalTokens]);
+      logId = logR.rows[0].id;
+      await query("UPDATE questions SET ai_generated_answer=$2, updated_at=now() WHERE id=$1", [questionId, full]);
+    } catch (e) {
+      console.error('[analyze-stream] 持久化失败:', e.message);
+    }
+    sseSend({ done: true, logId, strength: effective.id, model, totalTokens });
+    res.write('data: [DONE]\n\n');
+    res.end();
+  } catch (e) {
+    // 客户端断开导致的 abort：headers 未发就直接结束；已发则回传错误事件
+    if (abort.signal.aborted) {
+      if (res.headersSent) {
+        try { res.write('data: {"error":"连接中断，分析已中止"}\n\n'); res.end(); } catch (_) {}
+      }
+      return;
+    }
+    next(e);
+  }
+});
+
+// 举一反三：基于当前错题生成 1-2 道同类变式题。
+// 输出短（~600 token），同步返回即可，不触碰 Cloudflare 100s 上限。
+router.post('/variants', async (req, res, next) => {
+  try {
+    const { questionId } = req.body || {};
+    if (!questionId) return res.status(400).json({ code: 400, data: null, message: '缺少 questionId' });
+    const qr = await query('SELECT * FROM questions WHERE id=$1 AND user_id=$2', [questionId, req.userId]);
+    if (!qr.rows.length) return res.status(404).json({ code: 404, data: null, message: '错题不存在' });
+    const q = qr.rows[0];
+
+    // 1B 小模型：指令极短、逐条编号、只出题不解题
+    const prompt = [
+      '任务：仿照下面的错题，出2道同类变式题（知识点相同，数字/情境变化）。',
+      '格式：每题一行，形如 "1. 题目"。不要解答，不要多余的话。',
+      '错题：' + String(q.original_question || '').slice(0, 500),
+    ].join('\n');
+
+    const LLAMA_BASE = () => process.env.LLAMA_BASE_URL || 'http://127.0.0.1:8080';
+    const r = await fetch(`${LLAMA_BASE()}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: process.env.MODEL_NAME || 'local',
+        messages: [{ role: 'user', content: prompt }],
+        max_tokens: 600,
+        temperature: 0.8,   // 变式题需要多样性
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(180000),
+    });
+    if (!r.ok) {
+      let detail = '';
+      try { detail = (await r.text()).slice(0, 200); } catch (_) {}
+      return res.status(502).json({ code: 502, data: null, message: `模型返回 ${r.status}${detail}` });
+    }
+    const data = await r.json();
+    const choice = data.choices?.[0]?.message || {};
+    // 合并思考与答案：变式题在 content；reasoning 若含题目则整体透传由前端解析行
+    const text = ((choice.content || '') + '\n' + (choice.reasoning_content || '')).trim();
+    if (!text) return res.status(502).json({ code: 502, data: null, message: '模型未生成内容，请重试' });
+    res.json({ code: 0, data: { variants: text }, message: 'ok' });
+  } catch (e) { next(e); }
+});
+
 module.exports = router;

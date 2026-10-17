@@ -7,6 +7,7 @@ import '../core/api_client.dart';
 import '../core/ui_states.dart';
 import '../providers/question_provider.dart';
 import '../providers/stats_provider.dart';
+import '../widgets/modern_card.dart';
 
 class QuestionDetailPage extends ConsumerWidget {
   const QuestionDetailPage({super.key, required this.id});
@@ -50,9 +51,16 @@ class QuestionDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final detail = ref.watch(questionDetailProvider(id));
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('错题详情'),
+        backgroundColor: scheme.surface.withValues(alpha: 0.75),
+        flexibleSpace: GlassContainer(
+          opacity: 0.75,
+          blurSigma: 10,
+          child: const SizedBox.expand(),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.delete_outline),
@@ -130,7 +138,13 @@ class _DetailContent extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 16),
-        _Section(title: '原题', child: Text('${q.originalQuestion}', style: const TextStyle(fontSize: 15, height: 1.5))),
+        Hero(
+          tag: 'question-$id',
+          child: Material(
+            color: Colors.transparent,
+            child: _Section(title: '原题', child: Text('${q.originalQuestion}', style: const TextStyle(fontSize: 15, height: 1.5))),
+          ),
+        ),
         if (q.myAnswer != null && '${q.myAnswer}'.isNotEmpty)
           _Section(title: '我的答案', child: Text('${q.myAnswer}', style: const TextStyle(fontSize: 14, height: 1.5))),
         if (q.correctAnswer != null && '${q.correctAnswer}'.isNotEmpty)
@@ -171,6 +185,8 @@ class _DetailContent extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 24),
+        _VariantsSection(questionId: id),
+        const SizedBox(height: 24),
         FilledButton.icon(
           onPressed: () => context.push('/ai-analysis', extra: {'questionId': int.tryParse(id)}),
           icon: const Icon(Icons.auto_awesome),
@@ -178,6 +194,121 @@ class _DetailContent extends ConsumerWidget {
           style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
         ),
       ],
+    );
+  }
+}
+
+/// 举一反三：本地模型基于当前错题生成 1-2 道同类变式题（折叠展示）
+class _VariantsSection extends StatefulWidget {
+  const _VariantsSection({required this.questionId});
+  final String questionId;
+
+  @override
+  State<_VariantsSection> createState() => _VariantsSectionState();
+}
+
+class _VariantsSectionState extends State<_VariantsSection> {
+  bool _loading = false;
+  List<String>? _items; // 解析出的变式题列表
+  String? _error;
+  bool _expanded = false;
+
+  Future<void> _generate() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      final data = await ApiClient().post('/ai/variants', body: {'questionId': int.tryParse(widget.questionId)}) as Map;
+      // 解析行：取形如 "1." "2、" 开头的行；没有编号行则整段作为单条
+      final raw = (data['variants'] ?? '').toString();
+      final lines = raw.split('\n').map((l) => l.trim()).where((l) => l.isNotEmpty).toList();
+      final numbered = lines.where((l) => RegExp(r'^\d{1,2}[.、．)]').hasMatch(l)).toList();
+      setState(() {
+        _items = numbered.length >= 1 ? numbered : [raw];
+        _loading = false;
+        _expanded = true;
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _error = e.toString();
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return ModernCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(children: [
+            const Icon(Icons.psychology_alt, size: 18),
+            const SizedBox(width: 6),
+            Text('举一反三（同类变式题）', style: Theme.of(context).textTheme.titleSmall),
+            const Spacer(),
+            TextButton.icon(
+              onPressed: _loading ? null : _generate,
+              icon: _loading
+                  ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.auto_fix_high, size: 16),
+              label: Text(_items == null ? '生成' : '重新生成', style: const TextStyle(fontSize: 12)),
+            ),
+          ]),
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('本地模型出题中，约 30-90 秒…', style: TextStyle(fontSize: 12)),
+            ),
+          if (_error != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(_error!, style: TextStyle(fontSize: 12, color: scheme.error)),
+            ),
+          if (_items != null && !_loading) ...[
+            AnimatedCrossFade(
+              duration: const Duration(milliseconds: 200),
+              crossFadeState: _expanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+              firstChild: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < _items!.length; i++)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('${i + 1}.', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: scheme.primary)),
+                          const SizedBox(width: 6),
+                          Expanded(child: Text(_items![i].replaceFirst(RegExp(r'^\d{1,2}[.、．)]\s*'), ''), style: const TextStyle(fontSize: 13, height: 1.5))),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
+              secondChild: Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton(
+                  onPressed: () => setState(() => _expanded = true),
+                  child: Text('展开查看 ${_items!.length} 道变式题', style: const TextStyle(fontSize: 12)),
+                ),
+              ),
+            ),
+            if (_expanded)
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => setState(() => _expanded = false),
+                  child: const Text('收起', style: TextStyle(fontSize: 12)),
+                ),
+              ),
+          ],
+        ],
+      ),
     );
   }
 }

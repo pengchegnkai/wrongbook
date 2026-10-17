@@ -1,22 +1,104 @@
 /// providers/analysis_provider.dart —— AI 分析流程
+import 'dart:async';
+import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
 import '../models/analysis_log.dart';
 
 class AnalysisState {
   final bool running;
+  final bool streaming; // 流式进行中（UI 用纯文本展示，完成后切 Markdown）
   final String? response;
   final String? error;
   final int? logId;
   final String? strength;
-  const AnalysisState({this.running = false, this.response, this.error, this.logId, this.strength});
+  const AnalysisState({
+    this.running = false,
+    this.streaming = false,
+    this.response,
+    this.error,
+    this.logId,
+    this.strength,
+  });
 }
 
 class AnalysisNotifier extends StateNotifier<AnalysisState> {
   AnalysisNotifier() : super(const AnalysisState());
 
-  /// 异步分析：POST(async:true) 立即拿 logId → 每 3 秒轮询状态直到完成。
-  /// 背景：经 Cloudflare 免费版隧道时源站响应约 100s 超时，长分析必须异步。
+  /// 流式分析（打字机效果）：POST SSE → 逐 delta 更新 state。
+  /// 流式响应持续有字节流动，经 Cloudflare 隧道也不会触发 100s 超时。
+  /// 节流：UI 每 100ms 刷新一次（845 上 Markdown/文本重排有成本）。
+  Future<void> analyzeStream({required int questionId, int? templateId, String? strength, String? extra}) async {
+    state = const AnalysisState(running: true, streaming: true);
+    String full = '';
+    var lastFlush = DateTime.now();
+    try {
+      final api = ApiClient();
+      api.ensureConfigured();
+      final resp = await api.dio.post(
+        '/ai/analyze-question-stream',
+        data: {
+          'questionId': questionId,
+          if (templateId != null) 'templateId': templateId,
+          if (strength != null) 'strength': strength,
+          if (extra != null) 'extra': extra,
+        },
+        options: Options(
+          responseType: ResponseType.stream,
+          headers: {'Accept': 'text/event-stream'},
+        ),
+      );
+      final byteStream = (resp.data as ResponseBody).stream;
+      String buf = '';
+      int? logId;
+      String? effStrength;
+      String? streamError;
+
+      await for (final chunk in byteStream) {
+        buf += utf8.decode(chunk, allowMalformed: true);
+        final lines = buf.split('\n');
+        buf = lines.removeLast();
+        for (final line in lines) {
+          final t = line.trim();
+          if (!t.startsWith('data:')) continue;
+          final payload = t.substring(5).trim();
+          if (payload.isEmpty || payload == '[DONE]') continue;
+          try {
+            final j = jsonDecode(payload) as Map;
+            if (j['error'] != null) {
+              streamError = j['error'].toString();
+            } else if (j['done'] == true) {
+              logId = j['logId'] as int?;
+              effStrength = j['strength']?.toString();
+              final finalText = j['response']?.toString();
+              if (finalText != null && finalText.isNotEmpty) full = finalText;
+            } else if (j['delta'] != null) {
+              full += j['delta'].toString();
+            }
+          } catch (_) { /* 不完整行忽略 */ }
+        }
+        // 节流刷新
+        final now = DateTime.now();
+        if (now.difference(lastFlush).inMilliseconds >= 100 && mounted) {
+          lastFlush = now;
+          state = AnalysisState(running: true, streaming: true, response: full);
+        }
+      }
+      if (streamError != null) throw Exception(streamError);
+      if (full.isEmpty) throw Exception('模型未返回内容，请重试');
+      state = AnalysisState(response: full, logId: logId, strength: effStrength);
+    } catch (e) {
+      // 部分内容已到：展示已收到的文本而不是全丢
+      if (full.isNotEmpty) {
+        state = AnalysisState(response: full, error: '连接中断：$e（已显示部分结果）');
+      } else {
+        state = AnalysisState(error: e.toString());
+      }
+    }
+  }
+
+  /// 异步轮询模式（保留为回退：流式失败时 UI 可提示切换）
   Future<void> analyze({required int questionId, int? templateId, String? strength, String? extra}) async {
     state = const AnalysisState(running: true);
     try {

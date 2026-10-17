@@ -1,7 +1,9 @@
 /// pages/review_page.dart —— 复习模式
 /// 卡片翻转（正面：原题 + 我的答案；背面：正确答案 + 解析）
+/// Tinder 交互：左滑=不会，右滑=掌握（带震动与飞出动画）；底部按钮保留。
 /// 提交掌握度后该卡片从本地列表移除；全部完成显示完成态。
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../core/ui_states.dart';
@@ -22,6 +24,24 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
   bool _submitting = false;
   List<Question>? _local; // 本地剩余卡片：提交成功即移除（来源：provider 首次数据）
   int? _initialCount; // 首次拉到的卡片总数：区分"今天本来就没有"和"已复习完"
+  double _dragDx = 0; // 顶部卡片拖拽位移（Tinder 滑卡）
+
+  /// 提交并翻页：滑卡/按钮统一入口
+  Future<void> _submitCurrent(String result) async {
+    final idx = _pageCtrl.page?.round() ?? 0;
+    await _submit(idx, result);
+    if (mounted && _local != null && _local!.isNotEmpty) {
+      // 提交成功后移除了卡片，翻到下一张（越界则停在最后一页）
+      final next = idx.clamp(0, _local!.length - 1);
+      if (_pageCtrl.hasClients) {
+        await _pageCtrl.animateToPage(
+          next,
+          duration: const Duration(milliseconds: 250),
+          curve: Curves.easeOut,
+        );
+      }
+    }
+  }
 
   @override
   void initState() {
@@ -153,12 +173,28 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                       child: PageView.builder(
                         controller: _pageCtrl,
                         itemCount: list.length,
-                        onPageChanged: (i) => setState(() => _flipped = false),
-                        itemBuilder: (context, i) => _ReviewCard(
-                          question: list[i],
-                          flipped: _flipped,
-                          onFlip: () => setState(() => _flipped = !_flipped),
-                        ),
+                        onPageChanged: (i) => setState(() {
+                          _flipped = false;
+                          _dragDx = 0; // 换页重置拖拽
+                        }),
+                        itemBuilder: (context, i) {
+                          final isTop = i == (_pageCtrl.page?.round() ?? 0);
+                          return _SwipeCard(
+                            dx: isTop ? _dragDx : 0,
+                            enabled: isTop && !_submitting,
+                            onDrag: (dx) => setState(() => _dragDx = dx),
+                            onCommit: (right) {
+                              HapticFeedback.mediumImpact(); // 滑出确认震动
+                              _submitCurrent(right ? 'good' : 'again');
+                            },
+                            onCancel: () => setState(() => _dragDx = 0),
+                            child: _ReviewCard(
+                              question: list[i],
+                              flipped: _flipped,
+                              onFlip: () => setState(() => _flipped = !_flipped),
+                            ),
+                          );
+                        },
                       ),
                     ),
                     // 底部三键
@@ -176,7 +212,7 @@ class _ReviewPageState extends ConsumerState<ReviewPage> {
                                 child: Padding(
                                   padding: const EdgeInsets.symmetric(horizontal: 4),
                                   child: FilledButton(
-                                    onPressed: _submitting ? null : () => _submit(_pageCtrl.page?.round() ?? 0, b.$1),
+                                    onPressed: _submitting ? null : () => _submitCurrent(b.$1),
                                     style: FilledButton.styleFrom(
                                       backgroundColor: b.$3,
                                       minimumSize: const Size.fromHeight(48),
@@ -303,6 +339,82 @@ class _ReviewCard extends StatelessWidget {
             ),
             child: flipped ? back : front,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Tinder 滑卡容器：水平拖拽跟手、轻微旋转、方向角标；
+/// 越过阈值松手 → 飞出并回调提交，否则回弹。
+class _SwipeCard extends StatelessWidget {
+  const _SwipeCard({
+    required this.dx,
+    required this.onDrag,
+    required this.onCommit,
+    required this.onCancel,
+    required this.child,
+    required this.enabled,
+  });
+
+  final double dx;
+  final ValueChanged<double> onDrag;
+  final ValueChanged<bool> onCommit; // true=右滑(掌握) false=左滑(不会)
+  final VoidCallback onCancel;
+  final Widget child;
+  final bool enabled;
+
+  static const _threshold = 110.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final progress = (dx.abs() / _threshold).clamp(0.0, 1.0);
+    return GestureDetector(
+      onHorizontalDragStart: enabled ? (_) {} : null,
+      onHorizontalDragUpdate: enabled
+          ? (d) => onDrag(dx + d.delta.dx)
+          : null,
+      onHorizontalDragEnd: enabled
+          ? (d) {
+              final v = d.velocity.pixelsPerSecond.dx;
+              if (dx > _threshold || v > 900) {
+                onCommit(true);
+              } else if (dx < -_threshold || v < -900) {
+                onCommit(false);
+              } else {
+                onCancel();
+              }
+            }
+          : null,
+      child: Transform.translate(
+        offset: Offset(dx, 0),
+        child: Transform.rotate(
+          angle: dx / 28 * 0.03, // 轻微倾斜（845 上纯 transform 零成本）
+          child: Stack(children: [
+            child,
+            // 方向角标：右滑=掌握（绿） 左滑=不会（红）
+            if (progress > 0.15)
+              Positioned(
+                top: 18,
+                left: dx > 0 ? 18 : null,
+                right: dx < 0 ? 18 : null,
+                child: Opacity(
+                  opacity: progress * 0.9,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: (dx > 0 ? Colors.green : Colors.red).withValues(alpha: 0.85),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      dx > 0 ? '掌握 ✓' : '不会 ✗',
+                      style: const TextStyle(
+                          color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                    ),
+                  ),
+                ),
+              ),
+          ]),
         ),
       ),
     );

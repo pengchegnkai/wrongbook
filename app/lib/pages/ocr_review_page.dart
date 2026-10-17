@@ -40,6 +40,9 @@ class _OcrReviewPageState extends ConsumerState<OcrReviewPage> {
   bool _rawExpanded = false;
   bool _saving = false;
   bool _filled = false;
+  // 悬浮图片小窗（校对时可拖到任意位置比对原图）
+  Offset _floatPos = const Offset(220, 120);
+  bool _floatCollapsed = true;
 
   @override
   void didChangeDependencies() {
@@ -165,19 +168,13 @@ class _OcrReviewPageState extends ConsumerState<OcrReviewPage> {
           // 首帧渲染编辑器，随后填充编辑框
           WidgetsBinding.instance.addPostFrameCallback((_) => _applyResult(ocr.result));
         }
-        body = Column(
+        body = Stack(children: [
+          Column(
           children: [
             Expanded(
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  if (path != null && File(path).existsSync()) ...[
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.file(File(path), fit: BoxFit.contain),
-                    ),
-                    const SizedBox(height: 8),
-                  ],
                   _RawTextPanel(
                     text: ocr.result!.rawText,
                     expanded: _rawExpanded,
@@ -229,7 +226,20 @@ class _OcrReviewPageState extends ConsumerState<OcrReviewPage> {
               ),
             ),
           ],
-        );
+          ),
+          // 悬浮原图小窗：校对时可拖到任意位置比对，点按放大/缩小
+          if (path != null && File(path).existsSync())
+            _FloatingImage(
+              imagePath: path,
+              collapsed: _floatCollapsed,
+              position: _floatPos,
+              onPan: (d) => setState(() => _floatPos = Offset(
+                    (_floatPos.dx + d.dx).clamp(0.0, 400.0),
+                    (_floatPos.dy + d.dy).clamp(40.0, 700.0),
+                  )),
+              onToggle: () => setState(() => _floatCollapsed = !_floatCollapsed),
+            ),
+        ]);
     }
 
     return Scaffold(
@@ -337,6 +347,75 @@ class _QuestionEditor extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// 悬浮原图小窗：可拖拽（校对时随时比对原图），点按在缩略图/大图间切换
+class _FloatingImage extends StatelessWidget {
+  const _FloatingImage({
+    required this.imagePath,
+    required this.collapsed,
+    required this.position,
+    required this.onPan,
+    required this.onToggle,
+  });
+
+  final String imagePath;
+  final bool collapsed;
+  final Offset position;
+  final ValueChanged<Offset> onPan;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    final size = collapsed ? 110.0 : 320.0;
+    return Positioned(
+      left: position.dx,
+      top: position.dy,
+      child: GestureDetector(
+        onPanUpdate: (d) => onPan(d.delta),
+        onTap: onToggle,
+        child: Container(
+          width: size,
+          height: size,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Theme.of(context).colorScheme.primary, width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(12.5),
+            child: Stack(children: [
+              Positioned.fill(
+                child: Image.file(File(imagePath), fit: collapsed ? BoxFit.cover : BoxFit.contain),
+              ),
+              Positioned(
+                top: 4,
+                right: 4,
+                child: Container(
+                  padding: const EdgeInsets.all(3),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Icon(
+                    collapsed ? Icons.zoom_out_map : Icons.zoom_in_map,
+                    size: 14,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+            ]),
+          ),
+        ),
       ),
     );
   }

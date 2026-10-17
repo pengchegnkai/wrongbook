@@ -39,6 +39,7 @@ import '../pages/model_manage_page.dart';
 import '../pages/model_download_page.dart';
 import '../pages/login_device_manage_page.dart';
 import '../pages/qr_scan_page.dart';
+import '../widgets/main_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   const publicPaths = {'/splash', '/login', '/register', '/server-config'};
@@ -65,12 +66,28 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/register', builder: (_, __) => const RegisterPage()),
       GoRoute(path: '/server-config', builder: (_, __) => const ServerConfigPage()),
       GoRoute(path: '/qr-scan', builder: (_, __) => const QrScanPage()),
-      GoRoute(path: '/', builder: (_, __) => const HomePage()),
-      GoRoute(
-        path: '/questions',
-        builder: (_, __) => const QuestionListPage(),
-        routes: [
-          GoRoute(path: 'detail/:id', builder: (_, s) => QuestionDetailPage(id: s.pathParameters['id']!)),
+      // ---- 底部导航壳：首页 / 错题 / 复习 / 我的（各自独立导航栈） ----
+      StatefulShellRoute.indexedStack(
+        builder: (_, __, navigationShell) => MainShell(navigationShell: navigationShell),
+        branches: [
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/', builder: (_, __) => const HomePage()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(
+              path: '/questions',
+              builder: (_, __) => const QuestionListPage(),
+              routes: [
+                GoRoute(path: 'detail/:id', builder: (_, s) => QuestionDetailPage(id: s.pathParameters['id']!)),
+              ],
+            ),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/review', builder: (_, __) => const ReviewPage()),
+          ]),
+          StatefulShellBranch(routes: [
+            GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
+          ]),
         ],
       ),
       GoRoute(path: '/ai-analysis', builder: (_, s) {

@@ -8,8 +8,8 @@ import 'package:flutter/cupertino.dart';
 const _seedLight = Color(0xFF4F6BED);
 const _seedDark = Color(0xFF8FA3F5);
 
-ThemeData _baseTheme(Color seed, Brightness brightness) {
-  final scheme = ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
+ThemeData _baseTheme(Color seed, Brightness brightness, {ColorScheme? overrideScheme}) {
+  final scheme = overrideScheme ?? ColorScheme.fromSeed(seedColor: seed, brightness: brightness);
   final isLight = brightness == Brightness.light;
 
   return ThemeData(
@@ -151,3 +151,12 @@ ThemeData _baseTheme(Color seed, Brightness brightness) {
 ThemeData buildLightTheme() => _baseTheme(_seedLight, Brightness.light);
 
 ThemeData buildDarkTheme() => _baseTheme(_seedDark, Brightness.dark);
+
+/// Material You 动态取色入口（Android 12+ 壁纸取色；低版本返回 null 走静态主题）。
+/// 动态 scheme 保住品牌级排版/组件形状，只换色板。
+ThemeData? buildThemeFromScheme(ColorScheme? scheme, Brightness fallbackBrightness) {
+  if (scheme == null) {
+    return fallbackBrightness == Brightness.light ? buildLightTheme() : buildDarkTheme();
+  }
+  return _baseTheme(scheme, scheme.brightness, overrideScheme: scheme);
+}
