@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:skeletonizer/skeletonizer.dart';
 import '../core/ui_states.dart';
 import '../providers/stats_provider.dart';
 import '../widgets/modern_card.dart';
@@ -96,10 +95,7 @@ class _HomeContent extends ConsumerWidget {
     final stats = ref.watch(overviewStatsProvider);
     final weekly = ref.watch(weeklyStatsProvider);
     return stats.when(
-      loading: () => const Skeletonizer(
-        enabled: true,
-        child: _FakeHomeContent(),
-      ),
+      loading: () => const _FakeHomeContent(),
       error: (e, _) => ErrorRetryView(
         message: e.toString().startsWith('Exception:') ? e.toString().substring(10) : e.toString(),
         onRetry: () => ref.invalidate(overviewStatsProvider),
