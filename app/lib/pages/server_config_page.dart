@@ -12,6 +12,7 @@ import '../providers/review_provider.dart';
 import '../providers/prompt_template_provider.dart';
 import '../providers/strength_provider.dart';
 import '../providers/ai_memory_provider.dart';
+import '../providers/local_model_provider.dart';
 
 class ServerConfigPage extends ConsumerStatefulWidget {
   const ServerConfigPage({super.key});
@@ -68,6 +69,7 @@ class _ServerConfigPageState extends ConsumerState<ServerConfigPage> {
     ref.invalidate(promptTemplatesProvider);
     ref.invalidate(strengthsProvider);
     ref.invalidate(aiProfileProvider);
+    ref.invalidate(modelAvailabilityProvider);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('已保存：${AppConfig.baseUrl}')));
       context.go('/login');

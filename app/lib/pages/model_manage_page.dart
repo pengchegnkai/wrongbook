@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../core/config.dart';
 import '../providers/local_model_provider.dart';
 import '../providers/inference_provider.dart';
 
@@ -13,18 +14,34 @@ class ModelManagePage extends ConsumerWidget {
     final models = ref.watch(modelListProvider);
     final availability = ref.watch(modelAvailabilityProvider);
     final selected = ref.watch(selectedModelProvider);
+    // 公网域名模式（https，无端口）：8080 不经隧道暴露，直连不可用是预期
+    final isDomainMode = AppConfig.baseUrl.startsWith('https://');
 
     return Scaffold(
       appBar: AppBar(title: const Text('本地模型管理'), actions: [
+        IconButton(
+          icon: const Icon(Icons.refresh),
+          tooltip: '重新检测',
+          onPressed: () => ref.invalidate(modelAvailabilityProvider),
+        ),
         IconButton(icon: const Icon(Icons.download), onPressed: () => context.push('/model-download')),
       ]),
       body: ListView(padding: const EdgeInsets.all(12), children: [
         Card(child: ListTile(
           leading: availability.maybeWhen(
-            data: (ok) => Icon(ok ? Icons.check_circle : Icons.cancel, color: ok ? Colors.green : Colors.red),
+            data: (ok) => Icon(ok ? Icons.check_circle : Icons.cancel, color: ok ? Colors.green : Colors.orange),
             orElse: () => const CircularProgressIndicator()),
           title: const Text('模型服务（Termux llama-server）'),
-          subtitle: Text(availability.maybeWhen(data: (ok) => ok ? '在线 :8080' : '离线', orElse: () => '检测中')),
+          subtitle: availability.maybeWhen(
+            data: (ok) => ok
+                ? const Text('在线 :8080')
+                : Text(isDomainMode
+                    ? '公网域名模式：模型端口不对外开放，直连不可用（预期行为）。\nAI 分析走服务器代理，不受影响。'
+                    : '离线：请确认与服务器同内网且 llama-server 已启动（TUI 可重启）'),
+            loading: () => const Text('检测中…'),
+            error: (e, _) => Text('检测失败：$e'),
+          ),
+          isThreeLine: true,
         )),
         const SizedBox(height: 8),
         ...models.map((m) => Card(

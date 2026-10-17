@@ -45,8 +45,10 @@ class ModelListNotifier extends StateNotifier<List<ModelInfo>> {
 /// 当前选用模型
 final selectedModelProvider = StateProvider<String?>((ref) => null);
 
-/// 模型服务可用性
-final modelAvailabilityProvider = FutureProvider<bool>((ref) async {
+/// 模型服务可用性（autoDispose：每次进入页面重新探测，不缓存旧结果）。
+/// 公网域名模式下 llama-server 的 8080 有意不暴露 → 必然不可直连，
+/// 这是预期行为；AI 分析走后端 /api/ai/* 代理，不受影响。
+final modelAvailabilityProvider = FutureProvider.autoDispose<bool>((ref) async {
   final engine = ref.watch(inferenceEngineProvider);
   return engine.isAvailable();
 });
