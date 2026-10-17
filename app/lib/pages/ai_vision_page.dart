@@ -50,7 +50,14 @@ class _AiVisionPageState extends ConsumerState<AiVisionPage> {
   Future<void> _pick(ImageSource source) async {
     setState(() => _error = null);
     try {
-      final x = await _picker.pickImage(source: source, imageQuality: 90);
+      // maxWidth/Height 960：视觉 token 数与图片像素成正比，
+      // 缩图是纯 CPU 视觉推理的最大提速点（清晰度仍够识别题目）
+      final x = await _picker.pickImage(
+        source: source,
+        imageQuality: 88,
+        maxWidth: 960,
+        maxHeight: 960,
+      );
       if (x == null) return;
       final f = File(x.path);
       if (!await f.exists()) throw Exception('图片文件不存在，请重试');

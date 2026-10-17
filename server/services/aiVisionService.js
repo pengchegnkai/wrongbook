@@ -53,6 +53,10 @@ async function parseImage(filePath, mimetype) {
   ];
 
   try {
+    // 用流式对接（stream:true）：llama-server 对非流式请求要等全部生成完
+    // 才返回 body，会撞 Node undici 默认 300s bodyTimeout（表现为
+    // "fetch failed"）；流式下 headers 立即到达、token 间隔仅数秒。
+    // 整体仍受 AbortSignal.timeout(VISION_TIMEOUT_MS) 约束。
     const r = await fetch(`${LLAMA_BASE()}/v1/chat/completions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -61,7 +65,7 @@ async function parseImage(filePath, mimetype) {
         messages,
         max_tokens: 700,
         temperature: 0.1,
-        stream: false,
+        stream: true,
       }),
       signal: AbortSignal.timeout(VISION_TIMEOUT_MS()),
     });
@@ -81,10 +85,27 @@ async function parseImage(filePath, mimetype) {
       };
     }
 
-    const data = await r.json();
-    const choice = data.choices?.[0]?.message || {};
-    // 推理型多模态模型可能把正文放 reasoning_content，合并后取 JSON
-    const content = ((choice.content || '') + '\n' + (choice.reasoning_content || '')).trim();
+    // 解析上游 SSE，累计 content + reasoning_content
+    const decoder = new TextDecoder();
+    let buf = '';
+    let content = '';
+    for await (const chunk of r.body) {
+      buf += decoder.decode(chunk, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t.startsWith('data:')) continue;
+        const payload = t.slice(5).trim();
+        if (payload === '[DONE]') continue;
+        try {
+          const j = JSON.parse(payload);
+          const d = j.choices?.[0]?.delta || {};
+          content += (d.content || '') + (d.reasoning_content || '');
+        } catch (_) { /* 不完整 JSON 行忽略 */ }
+      }
+    }
+
     const obj = extractJson(content);
     if (!obj) {
       return { ok: false, code: 'error', message: '视觉模型未返回有效结构，请重试或改用极速模式' };
@@ -94,7 +115,7 @@ async function parseImage(filePath, mimetype) {
       subject: typeof obj.subject === 'string' ? obj.subject.trim() : '',
       question: obj.question.trim(),
       myAnswer: typeof obj.myAnswer === 'string' ? obj.myAnswer.trim() : '',
-      model: data.model || MODEL_NAME(),
+      model: MODEL_NAME(),
     };
   } catch (e) {
     const isTimeout = e && (e.name === 'TimeoutError' || e.name === 'AbortError');
