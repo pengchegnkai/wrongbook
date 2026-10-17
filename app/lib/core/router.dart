@@ -39,6 +39,7 @@ import '../pages/model_manage_page.dart';
 import '../pages/model_download_page.dart';
 import '../pages/login_device_manage_page.dart';
 import '../pages/qr_scan_page.dart';
+import '../pages/ai_vision_page.dart';
 import '../widgets/main_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -103,6 +104,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/settings', builder: (_, __) => const SettingsPage()),
       GoRoute(path: '/profile', builder: (_, __) => const ProfilePage()),
       GoRoute(path: '/scan', builder: (_, __) => const ScanPage()),
+      GoRoute(path: '/ai-vision', builder: (_, __) => const AiVisionPage()),
       GoRoute(path: '/ocr-review', builder: (_, __) => const OcrReviewPage()),
       GoRoute(path: '/pending-queue', builder: (_, __) => const PendingQueuePage()),
       GoRoute(path: '/analysis-history', builder: (_, __) => const AnalysisHistoryPage()),

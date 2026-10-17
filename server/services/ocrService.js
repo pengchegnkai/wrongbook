@@ -236,4 +236,104 @@ async function processImage(srcPath) {
   return { rawText: text, lang, questions, enhanced: !!enhancedPath, corrected };
 }
 
-module.exports = { processImage, splitQuestions, cjkRatio, sharpAvailable, runTesseract };
+// ---- 统一结构化解析（模式 A：极速文本识别） ----
+// 与模式 B（aiVisionService）统一的返回结构与 Prompt。
+// 极速：sharp 预处理(可选) → tesseract 原始文本 → 文本 LLM 纠错+结构化(3s 超时降级)
+const UNIFIED_PROMPT =
+  '提取图中的题目和作答，输出JSON：{"subject":"学科","question":"排版整齐的原题","myAnswer":"学生的作答"}。不要输出多余解释。';
+
+async function parseImageStructured(srcPath) {
+  // 1) 图像增强（可选）
+  const enhancedPath = await preprocessImage(srcPath);
+  const targetPath = enhancedPath || srcPath;
+
+  // 2) Tesseract 识别
+  let rawText = await runTesseract(targetPath, 'chi_sim+eng');
+  let lang = 'chi_sim+eng';
+  if (rawText === null) {
+    rawText = await runTesseract(targetPath, 'eng');
+    lang = 'eng';
+    if (rawText === null) return { ok: false, code: 'unavailable', message: 'OCR 服务不可用。请在 Termux 中执行：pkg install tesseract 并确认中文语言包（见 README）' };
+  } else if (cjkRatio(rawText) < 0.05) {
+    const engText = await runTesseract(targetPath, 'eng');
+    if (engText !== null) { rawText = engText; lang = 'eng'; }
+  }
+  if (enhancedPath) fs.unlink(enhancedPath, () => {});
+  if (!rawText) return { ok: false, code: 'empty', message: '未识别到文字：图片可能空白、模糊或过曝，请重拍清晰的图片' };
+
+  // 3) 文本 LLM 纠错 + 结构化（统一 Prompt；3s 超时降级规则切分）
+  try {
+    const r = await fetch(`${LLAMA_BASE()}/v1/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: MODEL_NAME(),
+        messages: [{
+          role: 'user',
+          // 纠错上下文：原文 + 统一指令（截断 1200 字符保护 1B 上下文）
+          content: `下面是OCR识别文本（可能有错字，如l/1、O/0）。${UNIFIED_PROMPT}\nOCR文本：\n${String(rawText).slice(0, 1200)}`,
+        }],
+        max_tokens: 700,
+        temperature: 0.1,
+        stream: false,
+      }),
+      signal: AbortSignal.timeout(LLM_TIMEOUT_MS()),
+    });
+    if (r.ok) {
+      const data = await r.json();
+      const content = ((data.choices?.[0]?.message?.content || '') + '\n' +
+        (data.choices?.[0]?.message?.reasoning_content || '')).trim();
+      const obj = extractJsonPublic(content);
+      if (obj && obj.question && obj.question.trim()) {
+        return {
+          ok: true,
+          subject: typeof obj.subject === 'string' ? obj.subject.trim() : '',
+          question: obj.question.trim(),
+          myAnswer: typeof obj.myAnswer === 'string' ? obj.myAnswer.trim() : '',
+          rawText,
+          lang,
+          corrected: true,
+        };
+      }
+    }
+  } catch (_) { /* LLM 超时/失败 → 降级规则切分 */ }
+
+  // 4) 降级：规则切分（原始能力，永远可用）
+  const questions = splitQuestions(rawText);
+  if (questions.length > 0) {
+    return {
+      ok: true,
+      subject: '',
+      question: questions[0].question || rawText.slice(0, 300),
+      myAnswer: questions[0].myAnswer || '',
+      rawText,
+      lang,
+      corrected: false,
+      extraQuestions: questions.length > 1 ? questions.slice(1) : undefined,
+    };
+  }
+  return {
+    ok: true,
+    subject: '',
+    question: rawText.slice(0, 300),
+    myAnswer: '',
+    rawText,
+    lang,
+    corrected: false,
+  };
+}
+
+/// 提取 JSON（供 parseImageStructured 用；与 aiVisionService 同规则）
+function extractJsonPublic(text) {
+  if (!text) return null;
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start < 0 || end <= start) return null;
+  try {
+    return JSON.parse(text.slice(start, end + 1));
+  } catch (_) {
+    return null;
+  }
+}
+
+module.exports = { processImage, splitQuestions, cjkRatio, sharpAvailable, runTesseract, parseImageStructured };

@@ -1,4 +1,5 @@
 // routes/ai.js —— AI 分析 / 图片理解 / 反馈 / profile
+const fs = require('fs');
 const express = require('express');
 const multer = require('multer');
 const { query } = require('../db');
@@ -9,6 +10,8 @@ const { resolveStrength } = require('../services/strengthResolver');
 const { retrieveContext } = require('../services/ragRetriever');
 const { getBaseInstructions } = require('../services/promptAdapter');
 const { recordFeedbackSignal, updateProfileFromStats } = require('../services/userProfileService');
+const aiVision = require('../services/aiVisionService');
+const ocrService = require('../services/ocrService');
 const router = express.Router();
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -436,6 +439,62 @@ router.post('/variants', async (req, res, next) => {
     if (!text) return res.status(502).json({ code: 502, data: null, message: '模型未生成内容，请重试' });
     res.json({ code: 0, data: { variants: text }, message: 'ok' });
   } catch (e) { next(e); }
+});
+
+// 双引擎图片解析：POST /api/ai/parse-image (multipart, 字段 image + mode)
+// mode=ocr    极速：sharp(可选)→tesseract→文本 LLM 纠错结构化（5-10s）
+// mode=vision 深度：图片 Base64 → 多模态模型（30-120s，需 MiniCPM-V+mmproj）
+// 统一返回：{ subject, question, myAnswer, rawText?(仅 ocr), engine, corrected? }
+router.post('/parse-image', upload.single('image'), async (req, res, next) => {
+  // 注意：本路由的 multer 是 memoryStorage（req.file.buffer），而两个引擎
+  // 都按文件路径处理 → 先落盘临时文件，finally 中删除
+  const os = require('os');
+  const path = require('path');
+  let tmp;
+  try {
+    if (!req.file) {
+      return res.status(400).json({ code: 400, data: null, message: '请上传图片（form 字段名：image）' });
+    }
+    tmp = path.join(os.tmpdir(), `parse_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${req.file.mimetype === 'image/png' ? 'png' : 'jpg'}`);
+    fs.writeFileSync(tmp, req.file.buffer);
+    const mode = req.body?.mode === 'vision' ? 'vision' : 'ocr';
+
+    if (mode === 'vision') {
+      const r = await aiVision.parseImage(tmp, req.file.mimetype);
+      if (!r.ok) {
+        const httpCode = r.code === 'no_multimodal' ? 501 : 502;
+        return res.status(httpCode).json({ code: httpCode, data: { engine: 'vision', reason: r.code }, message: r.message });
+      }
+      return res.json({
+        code: 0,
+        data: { subject: r.subject, question: r.question, myAnswer: r.myAnswer, engine: 'vision' },
+        message: 'ok',
+      });
+    }
+
+    const r = await ocrService.parseImageStructured(tmp);
+    if (!r.ok) {
+      return res.json({ code: 1, data: { engine: 'ocr', reason: r.code }, message: r.message });
+    }
+    res.json({
+      code: 0,
+      data: {
+        subject: r.subject,
+        question: r.question,
+        myAnswer: r.myAnswer,
+        rawText: r.rawText,      // 仅 ocr 模式返回（校对页可展开比对原始识别文本）
+        lang: r.lang,
+        engine: 'ocr',
+        corrected: r.corrected,
+        extraQuestions: r.extraQuestions,
+      },
+      message: 'ok',
+    });
+  } catch (e) {
+    next(e);
+  } finally {
+    if (tmp) fs.unlink(tmp, () => {});
+  }
 });
 
 module.exports = router;

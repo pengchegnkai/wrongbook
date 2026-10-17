@@ -18,6 +18,7 @@ class HomePage extends ConsumerWidget {
     (Icons.school, '复习模式', '/review'),
     (Icons.camera_alt, '拍照录入', '/scan'),
     (Icons.auto_awesome, 'AI 分析', '/ai-analysis'),
+    (Icons.document_scanner, '图片解析', '/ai-vision'),
     (Icons.bar_chart, '统计图表', '/charts'),
     (Icons.psychology, '提示词模板', '/prompt-templates'),
     (Icons.memory, 'AI 记忆', '/ai-memory'),
