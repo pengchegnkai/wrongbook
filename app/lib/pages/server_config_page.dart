@@ -26,10 +26,26 @@ class _ServerConfigPageState extends ConsumerState<ServerConfigPage> {
     if (AppConfig.isConfigured) _url.text = AppConfig.baseUrl;
   }
 
+  /// 地址规范化：
+  /// - 已带 scheme（https:// 或 http://）→ 原样（公网域名必须 https）
+  /// - 内网 IP / host:port（如 192.168.3.228:3000）→ 前缀 http://
+  /// - 裸公网域名（含 . 且非内网段）→ 前缀 https://
+  ///   （Cloudflare 代理的 http 入口会 301 重定向，直接填对可省一次跳转）
+  String _normalize(String raw) {
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    final host = raw.split(':').first;
+    final isPrivate = host.startsWith('192.168.') ||
+        host.startsWith('10.') ||
+        RegExp(r'^172\.(1[6-9]|2\d|3[01])\.').hasMatch(host) ||
+        host == 'localhost' ||
+        raw.startsWith('127.');
+    return isPrivate ? 'http://$raw' : 'https://$raw';
+  }
+
   Future<void> _save() async {
     final url = _url.text.trim();
     if (url.isEmpty) return;
-    final normalized = url.startsWith('http') ? url : 'http://$url';
+    final normalized = _normalize(url);
     AppConfig.setBaseUrl(normalized);
     // 持久化：重启后 main.dart 会自动恢复，无需重输
     await Hive.box('settings').put('baseUrl', normalized);
@@ -61,8 +77,8 @@ class _ServerConfigPageState extends ConsumerState<ServerConfigPage> {
             keyboardType: TextInputType.url,
             decoration: const InputDecoration(
               labelText: '服务器地址',
-              hintText: '如 192.168.1.100:3000',
-              helperText: '在 Termux 的 start-all.sh 输出中可查看内网地址',
+              hintText: '如 192.168.1.100:3000 或 https://cuoti.example.com',
+              helperText: '内网填 IP:端口；公网域名（Cloudflare）填完整 https:// 地址',
             ),
           ),
           const SizedBox(height: 16),

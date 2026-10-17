@@ -159,3 +159,67 @@ Tesseract 识别不保证全对，App 内 OCR 校对页**必须人工校对后�
 - 内网业务 API 全部需要 JWT 登录，无匿名访问。
 - `server/.env` 中的 `JWT_SECRET` 请修改。
 - PostgreSQL 不暴露内网。
+
+## 十二、公网访问（Cloudflare Tunnel，免费套餐）
+
+手机不在内网时，可通过 Cloudflare Tunnel 从公网访问后端（免费套餐即可，
+无需公网 IP、无需端口转发、流量不过本地防火墙）。前提：一个已托管在
+Cloudflare 的域名（NS 指向 Cloudflare，免费版即可）。
+
+### 安装与授权（一次性）
+
+```bash
+pkg install -y cloudflared      # Termux 官方仓库有（实测 2026.10.1）
+bash ~/cuoti/termux/tunnel.sh login
+# 打印一个 dash.cloudflare.com 链接 → 手机浏览器打开 → 登录 Cloudflare
+# → 选择域名 → 授权；完成后 ~/.cloudflared/cert.pem 自动生成
+```
+
+### 创建隧道并绑定域名（一次性）
+
+```bash
+bash ~/cuoti/termux/tunnel.sh setup cuoti.你的域名.com
+# 自动完成：创建命名隧道 cuoti + 写 ~/.cloudflared/config.yml
+#          + cloudflared tunnel route dns 写 CNAME 记录
+```
+
+只映射后端 API（localhost:3000）。llama-server(:8080) 与 PostgreSQL(:5432)
+一律不暴露公网。
+
+### 日常启停
+
+```bash
+bash ~/cuoti/termux/tunnel.sh start    # 后台运行（已验证边缘连接才返回）
+bash ~/cuoti/termux/tunnel.sh stop
+bash ~/cuoti/termux/tunnel.sh status
+bash ~/cuoti/termux/tunnel.sh quick    # 免登录临时隧道（随机 trycloudflare
+                                       # 地址，调试用，重启即换）
+```
+
+### App 端配置
+
+服务器配置页填完整域名：`https://cuoti.你的域名.com`（App 自动识别 https
+与内网 IP；裸域名会自动补 https）。
+
+模式差异（App 已自动适配）：
+
+| | 内网模式 | 公网域名模式 |
+|---|---|---|
+| 地址 | `http://192.168.x.x:3000` | `https://cuoti.你的域名.com` |
+| AI 分析 | 走后端 `/api/ai/*`（推荐，同公网） | 走后端 `/api/ai/*` |
+| 模型直连 | llama-server :8080 可直连 | 8080 不暴露，直连自动失效，推理走后端代理 |
+
+### 实测记录（2026-10）
+
+- `pkg install cloudflared` 直接可用（2026.10.1）
+- 快速隧道（`--url`）与命名隧道均验证打通：公网 → 边缘 → 本机 3000
+- `https://cuoti.pck-server.ccwu.cc/api/health` HTTP 200（1.3s，边缘在 lax）
+- 公网登录接口实测 code:0
+- 日志中的 ICMP proxy 警告无害（Termux 无权限配 ping_group_range，不影响 HTTP 隧道）
+
+### 安全注意
+
+- 隧道把后端暴露到公网：JWT 登录是唯一防线，`JWT_SECRET` 必须已改强随机值。
+- 免费版 Cloudflare 不强制源站校验；如需进一步加固，可在 Cloudflare
+  Zero Trust 配 Access 策略（本处仅作一般性说明，请以 Cloudflare 官方文档为准）。
+- 临时隧道（quick）地址公开可猜性低但任何人可访问，用完即停。

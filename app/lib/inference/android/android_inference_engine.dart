@@ -22,7 +22,10 @@ class AndroidInferenceEngine implements LocalInferenceEngine {
 
   ModelInfo? _current;
 
-  String get _llamaBase => '${AppConfig.baseUrl}:8080';
+  /// llama-server 直连地址。内网模式 = baseUrl:8080；
+  /// 公网域名模式（https）下 8080 不经隧道暴露 → llamaBase 返回 baseUrl，
+  /// /health 404 → isAvailable=false（推理改走后端 /api/ai/* 代理）
+  String get _llamaBase => AppConfig.llamaBase;
 
   @override
   Future<bool> isAvailable() async {
