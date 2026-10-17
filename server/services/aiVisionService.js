@@ -3,7 +3,11 @@
 // 精准理解手写体/公式/复杂排版；CPU 推理较慢（30-120s），前端已做等待提示。
 const fs = require('fs');
 
-const LLAMA_BASE = () => process.env.LLAMA_BASE_URL || 'http://127.0.0.1:8080';
+// 视觉引擎走独立实例（VISION_LLAMA_BASE_URL，默认 :8081）：
+// 多模态模型（~4.9GB 权重）与文本模型（~2.5GB）无法在 8GB 内存共存，
+// 由 termux/llama-vision.sh 负责"停文本 → 起视觉"的互换。
+const LLAMA_BASE = () =>
+  process.env.VISION_LLAMA_BASE_URL || 'http://127.0.0.1:8081';
 const MODEL_NAME = () => process.env.MODEL_NAME || 'local';
 // 视觉模式给足时间：纯 CPU 跑多模态，大图 prompt eval 可达数十秒
 const VISION_TIMEOUT_MS = () => parseInt(process.env.VISION_TIMEOUT_MS || '180000', 10);
