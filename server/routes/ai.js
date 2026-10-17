@@ -62,6 +62,36 @@ router.post('/analyze-question', async (req, res, next) => {
     }) + '\n\n【历史相似错题参考】\n' + rag.similarQuestions.join('\n') + '\n\n【用户偏好记忆】\n' + rag.memories.join('\n')
       + '\n\n【输出格式要求】\n' + getBaseInstructions();
 
+    // ---- 异步模式 ----
+    // 经 Cloudflare 隧道（免费版）调用时，代理对源站响应有约 100s 超时，
+    // 标准/深度档分析会被 524 掐断。async=true 时立即返回 logId，
+    // 后台执行，App 轮询 GET /analysis-status/:logId 取结果。
+    if (req.body && req.body.async === true) {
+      const logR = await query(
+        `INSERT INTO question_analysis_logs (user_id, question_id, template_id, rendered_prompt, ai_response, model, mode, platform, strength, duration_ms, provider)
+         VALUES ($1,$2,$3,$4,NULL,NULL,'local','termux-server',$5,NULL,'llama.cpp') RETURNING id`,
+        [req.userId, questionId, tpl.id, rendered, effective.id]);
+      const logId = logR.rows[0].id;
+      // 后台执行（不阻塞响应）；结果写回日志与题目
+      (async () => {
+        try {
+          const t0 = Date.now();
+          const result = await analyzeQuestion({ prompt: rendered, strength: effective });
+          await query(
+            `UPDATE question_analysis_logs SET ai_response=$2, model=$3, duration_ms=$4, total_tokens=$5 WHERE id=$1`,
+            [logId, result.text, result.model || 'local', Date.now() - t0, result.totalTokens || null]);
+          await query("UPDATE questions SET ai_generated_answer=$2, updated_at=now() WHERE id=$1",
+            [questionId, result.text]);
+        } catch (e) {
+          try {
+            await query("UPDATE question_analysis_logs SET ai_response=$2 WHERE id=$1",
+              [logId, '__ANALYSIS_ERROR__:' + (e && e.message ? e.message : String(e))]);
+          } catch (_) { /* 日志写失败只能放弃，无法通知 */ }
+        }
+      })();
+      return res.json({ code: 0, data: { logId, async: true, strength: effective.id }, message: 'ok' });
+    }
+
     const result = await analyzeQuestion({ prompt: rendered, strength: effective });
 
     // 写分析日志（load_time_ms/first_token_ms 尚未实现，不写假数据）
@@ -76,6 +106,29 @@ router.post('/analyze-question', async (req, res, next) => {
     await query("UPDATE questions SET ai_generated_answer=$2, updated_at=now() WHERE id=$1", [questionId, result.text]);
 
     res.json({ code: 0, data: { logId: logR.rows[0].id, response: result.text, strength: effective.id, model: result.model }, message: 'ok' });
+  } catch (e) { next(e); }
+});
+
+// 轮询异步分析结果：ai_response 为 NULL = 仍在执行（running）
+router.get('/analysis-status/:logId', async (req, res, next) => {
+  try {
+    const r = await query(
+      `SELECT id, ai_response, strength, model, duration_ms, total_tokens
+         FROM question_analysis_logs WHERE id=$1 AND user_id=$2`,
+      [req.params.logId, req.userId]);
+    if (!r.rows.length) return res.status(404).json({ code: 404, data: null, message: '分析日志不存在' });
+    const row = r.rows[0];
+    const errTag = '__ANALYSIS_ERROR__:';
+    let status = 'done';
+    let response = row.ai_response;
+    if (response == null) {
+      status = 'running';
+      response = null;
+    } else if (typeof response === 'string' && response.startsWith(errTag)) {
+      status = 'error';
+      response = response.slice(errTag.length);
+    }
+    res.json({ code: 0, data: { logId: row.id, status, response, strength: row.strength, model: row.model, durationMs: row.duration_ms }, message: 'ok' });
   } catch (e) { next(e); }
 });
 
