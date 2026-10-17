@@ -46,8 +46,11 @@ class _OcrReviewPageState extends ConsumerState<OcrReviewPage> {
     super.didChangeDependencies();
     if (_autoStarted) return;
     _autoStarted = true;
-    final extra = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    _imagePath = extra?['imagePath'] as String?;
+    // GoRouter 的 push(extra:) 不写入 ModalRoute.arguments，
+    // 必须经 GoRouterState.of(context).extra 取；旧路径仅作兜底
+    final args = GoRouterState.of(context).extra as Map<String, dynamic>? ??
+        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    _imagePath = args?['imagePath'] as String?;
     // 进入页面时重置全局 OCR 状态（作废在途旧请求），
     // ref 在 didChangeDependencies 中可用；不要放在 dispose（彼时 ref 已不可用）
     ref.read(ocrProvider.notifier).reset();
