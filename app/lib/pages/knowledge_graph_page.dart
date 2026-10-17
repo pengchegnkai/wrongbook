@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/api_client.dart';
+import '../widgets/mermaid_webview.dart';
 
 class KnowledgeGraphPage extends ConsumerStatefulWidget {
   const KnowledgeGraphPage({super.key});
@@ -46,9 +47,13 @@ class _KnowledgeGraphPageState extends ConsumerState<KnowledgeGraphPage> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('Mermaid 思维导图（WebView 渲染待接入，当前为源码模式）'),
+              const Text('知识点图谱（Mermaid 渲染；离线时可展开下方源码）'),
               const SizedBox(height: 16),
-              Expanded(child: SingleChildScrollView(child: SelectableText(_mermaid ?? '点击右上角按钮生成'))),
+              Expanded(
+                child: _mermaid != null
+                    ? MermaidWebview(mermaidSource: _mermaid!)
+                    : const Center(child: Text('点击右上角按钮生成')),
+              ),
               if (_mermaid != null)
                 TextButton.icon(
                   icon: const Icon(Icons.copy),

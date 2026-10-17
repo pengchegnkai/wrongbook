@@ -2,6 +2,7 @@
 /// mDNS 在部分 Android 网络下被路由器拦截（未验证，需你实测）；端口扫描为保底方案。
 import 'package:dio/dio.dart';
 import 'package:multicast_dns/multicast_dns.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 
 class ServerDiscoveryService {
   final Dio _dio = Dio(BaseOptions(connectTimeout: const Duration(seconds: 2), receiveTimeout: const Duration(seconds: 3)));
@@ -30,8 +31,17 @@ class ServerDiscoveryService {
   }
 
   Future<String> _guessPrefix() async {
-    // 无平台通道拿本机 IP 的通用方案：常见默认段回退
-    // TODO: 通过 network_info_plus 或原生通道获取本机 IP 推导网段（未验证，需你实测）
+    // 通过 network_info_plus 拿本机 Wi-Fi IP（如 192.168.3.42）→ 取前 3 段
+    try {
+      final ip = await NetworkInfo().getWifiIP();
+      if (ip != null && ip.isNotEmpty) {
+        final parts = ip.split('.');
+        if (parts.length == 4) return '${parts[0]}.${parts[1]}.${parts[2]}';
+      }
+    } catch (_) {
+      // 权限未授予 / 非 Wi-Fi 网络：走回退
+    }
+    // 常见默认段回退（依次由 UI 供用户选择或手动填前缀）
     return '192.168.1';
   }
 

@@ -1,5 +1,6 @@
 /// pages/question_list_page.dart —— 错题列表
 /// 筛选栏（学科 / 掌握度 / 搜索）+ 卡片列表 + 下拉刷新 + 上拉加载
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,6 +18,7 @@ class QuestionListPage extends ConsumerStatefulWidget {
 class _QuestionListPageState extends ConsumerState<QuestionListPage> {
   final _searchCtrl = TextEditingController();
   late final ScrollController _scrollCtrl;
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -27,6 +29,7 @@ class _QuestionListPageState extends ConsumerState<QuestionListPage> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchCtrl.dispose();
     _scrollCtrl.dispose();
     super.dispose();
@@ -42,10 +45,14 @@ class _QuestionListPageState extends ConsumerState<QuestionListPage> {
   }
 
   void _onSearchChanged(String v) {
-    final f = ref.read(questionFilterProvider);
-    ref.read(questionFilterProvider.notifier).state =
-        f.copyWith(search: v.isEmpty ? null : v, clearSearch: v.isEmpty);
-    ref.read(questionListProvider.notifier).refresh();
+    // 防抖：停输 400ms 才发起请求，避免逐键请求风暴
+    _debounce?.cancel();
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      final f = ref.read(questionFilterProvider);
+      ref.read(questionFilterProvider.notifier).state =
+          f.copyWith(search: v.isEmpty ? null : v, clearSearch: v.isEmpty);
+      ref.read(questionListProvider.notifier).refresh();
+    });
   }
 
   @override

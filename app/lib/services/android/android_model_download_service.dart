@@ -3,6 +3,7 @@
 /// 本服务只负责"给定 URL → 下载 → 校验 SHA256 → 落盘"。
 import 'dart:io';
 import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
 import 'android_model_storage_service.dart';
 
@@ -39,12 +40,14 @@ class ModelDownloadService {
   }
 
   Future<String> sha256OfFile(File f) async {
-    // Dart 无内置 sha256，需 crypto 包；为避免 pubspec 未含依赖导致编译失败，
-    // 这里用 Process 调 Termux/sha256sum 不可靠（App 内无 shell），改为提示用户。
-    // TODO: 在 pubspec.yaml 添加 crypto: ^3.0.3 后启用以下实现（需你实测）：
-    //   import 'package:crypto/crypto.dart';
-    //   final bytes = await f.readAsBytes(); return sha256.convert(bytes).toString();
-    throw UnimplementedError('SHA256 校验需在 pubspec.yaml 添加 crypto 包后启用（见注释），未验证');
+    // 流式分块计算：模型文件 1-5GB，不能 readAsBytes 整读进内存
+    final output = _DigestSink();
+    final conversion = sha256.startChunkedConversion(output);
+    await for (final chunk in f.openRead()) {
+      conversion.add(chunk);
+    }
+    conversion.close();
+    return output.digest.toString();
   }
 
   Future<bool> verifySha256(File f, String expected) async {
@@ -55,3 +58,13 @@ class ModelDownloadService {
 
 /// 简单 JSON 工具（避免未使用 import 警告保留）
 String encodeJson(Object? o) => jsonEncode(o);
+
+/// sha256.startChunkedConversion 的结果收集器
+class _DigestSink implements Sink<Digest> {
+  Digest? _digest;
+  Digest get digest => _digest!;
+  @override
+  void add(Digest data) => _digest = data;
+  @override
+  void close() {}
+}

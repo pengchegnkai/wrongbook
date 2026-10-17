@@ -33,6 +33,14 @@ dependencies:
   image_picker: ^1.0.5
   # 服务发现
   multicast_dns: ^0.3.2
+  # 本机 IP 获取（自动扫描网段推导）
+  network_info_plus: ^5.0.3
+  # SHA256 校验（模型下载）
+  crypto: ^3.0.3
+  # 摄像头扫码
+  mobile_scanner: ^5.2.3
+  # Mermaid 思维导图渲染
+  webview_flutter: ^4.7.0
 
   # 版本号以 pub.dev 官方页面为准，未逐一实测兼容性，需你 flutter pub get 验证
 

@@ -106,7 +106,9 @@ class _HomeContent extends ConsumerWidget {
             onAction: () => context.push('/scan'),
           );
         }
-        return ListView(
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(overviewStatsProvider),
+          child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
             _OverviewCards(s: s),
@@ -117,6 +119,7 @@ class _HomeContent extends ConsumerWidget {
             const SizedBox(height: 8),
             _EntryGrid(),
           ],
+        ),
         );
       },
     );

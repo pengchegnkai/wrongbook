@@ -7,6 +7,8 @@ import 'core/config.dart';
 import 'core/router.dart';
 import 'core/theme.dart';
 import 'providers/auth_provider.dart';
+import 'providers/local_record_provider.dart';
+import 'providers/network_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,6 +35,13 @@ class CuotiApp extends ConsumerWidget {
       ref.read(currentUserProvider.notifier).forceSignOut();
       router.go('/login');
     };
+    // 断网期间入队的操作（如离线建错题）在网络恢复时自动上传；
+    // 失败静默（队列保留，下次恢复再试）
+    NetworkStatus._offline.addListener(() {
+      if (!NetworkStatus.isOffline) {
+        ref.read(localRecordProvider.notifier).syncNow().catchError((_) => 0);
+      }
+    });
     return MaterialApp.router(
       title: '错题本',
       debugShowCheckedModeBanner: false,
