@@ -37,8 +37,8 @@ class CuotiApp extends ConsumerWidget {
     };
     // 断网期间入队的操作（如离线建错题）在网络恢复时自动上传；
     // 失败静默（队列保留，下次恢复再试）
-    NetworkStatus._offline.addListener(() {
-      if (!NetworkStatus.isOffline) {
+    ref.listen(networkOfflineProvider, (_, offline) {
+      if (offline == false) {
         ref.read(localRecordProvider.notifier).syncNow().catchError((_) => 0);
       }
     });

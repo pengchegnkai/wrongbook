@@ -55,7 +55,7 @@ class _QrScanPageState extends State<QrScanPage> {
           child: MobileScanner(
             controller: _scanner ??= MobileScannerController(),
             onDetect: _onDetect,
-            errorBuilder: (context, error) => Center(
+            errorBuilder: (context, error, child) => Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
                 child: Text('相机不可用：$error\n\n可用下方手动输入替代',
