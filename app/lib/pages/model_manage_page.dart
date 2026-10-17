@@ -28,11 +28,12 @@ class ModelManagePage extends ConsumerWidget {
       ]),
       body: ListView(padding: const EdgeInsets.all(12), children: [
         Card(child: ListTile(
-          leading: availability.maybeWhen(
+          leading: availability.when(
             data: (ok) => Icon(ok ? Icons.check_circle : Icons.cancel, color: ok ? Colors.green : Colors.orange),
-            orElse: () => const CircularProgressIndicator()),
-          title: const Text('模型服务（Termux llama-server）'),
-          subtitle: availability.maybeWhen(
+            loading: () => const CircularProgressIndicator(),
+            error: (_, __) => const Icon(Icons.error_outline, color: Colors.orange),
+          ),
+          subtitle: availability.when(
             data: (ok) => ok
                 ? const Text('在线 :8080')
                 : Text(isDomainMode
